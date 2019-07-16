@@ -1,5 +1,6 @@
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::quote;
+use std::fmt::Display;
 use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
@@ -11,14 +12,15 @@ pub fn call_with(
     params: TokenStream,
     raw_function: TokenStream,
 ) -> Result<TokenStream, syn::Error> {
-    let params: Params = syn::parse2(params.clone())?;
-    let function: syn::Item = syn::parse2(raw_function.clone())?;
+    let _params: Params = syn::parse2(params.clone()).context("error parsing params")?;
+    let function: syn::Item =
+        syn::parse2(raw_function.clone()).context("error parsing function body")?;
     let fn_item = match function {
         syn::Item::Fn(f) => f,
         _ => {
             return Err(syn::Error::new_spanned(
                 &raw_function,
-                "cthulhu macro only supported on functions right now",
+                "only supported on functions right now",
             ))
         }
     };
@@ -28,27 +30,16 @@ pub fn call_with(
 
     let mut c_params: Punctuated<FnArg, syn::Token![,]> = Punctuated::new();
     for param in params {
-        c_params.extend(to_c_param(param)?);
+        c_params.extend(to_c_param(param).context("failed to convert Rust type to FFI type")?);
     }
 
     let rust_fn = &raw_function;
-    let body: syn::Block = syn::parse2(quote! {{
-        #rust_fn
-
-        unimplemented!()
-    }})?;
-
-    Ok(syn::ItemFn {
-        abi: Some(syn::parse2(quote!(extern "C"))?),
-        decl: Box::new(syn::FnDecl {
-            inputs: c_params,
-            generics: syn::parse2(quote!())?,
-            ..*decl.clone()
-        }),
-        block: Box::new(body),
-        ..fn_item
-    }
-    .into_token_stream())
+    Ok(quote! {
+        extern "C" fn #name(#c_params) #return_type {
+            #rust_fn
+            unimplemented!()
+        }
+    })
 }
 
 fn to_c_param(arg: &FnArg) -> Result<Vec<FnArg>, syn::Error> {
@@ -61,6 +52,50 @@ fn to_c_param(arg: &FnArg) -> Result<Vec<FnArg>, syn::Error> {
 fn to_c_type(arg: &ArgCaptured) -> Result<Vec<FnArg>, syn::Error> {
     TYPE_MAPPING.with(|map| {
         let ArgCaptured { ty, pat, .. } = arg.clone();
+        match &ty {
+            syn::Type::Path(..) | syn::Type::Reference(..) => {}
+
+            syn::Type::Slice(..) => {
+                return Err(syn::Error::new(pat.span(), "Slice parameters not supported"))
+            }
+            syn::Type::Array(..) => {
+                return Err(syn::Error::new(pat.span(), "Array parameters not supported"))
+            }
+            syn::Type::Ptr(..) => {
+                return Err(syn::Error::new(pat.span(), "Ptr parameters not supported"))
+            }
+            syn::Type::BareFn(..) => {
+                return Err(syn::Error::new(pat.span(), "BareFn parameters not supported"))
+            }
+            syn::Type::Never(..) => {
+                return Err(syn::Error::new(pat.span(), "Never parameters not supported"))
+            }
+            syn::Type::Tuple(..) => {
+                return Err(syn::Error::new(pat.span(), "Tuple parameters not supported"))
+            }
+            syn::Type::TraitObject(..) => {
+                return Err(syn::Error::new(pat.span(), "TraitObject parameters not supported"))
+            }
+            syn::Type::ImplTrait(..) => {
+                return Err(syn::Error::new(pat.span(), "ImplTrait parameters not supported"))
+            }
+            syn::Type::Paren(..) => {
+                return Err(syn::Error::new(pat.span(), "Paren parameters not supported"))
+            }
+            syn::Type::Group(..) => {
+                return Err(syn::Error::new(pat.span(), "Group parameters not supported"))
+            }
+            syn::Type::Infer(..) => {
+                return Err(syn::Error::new(pat.span(), "Infer parameters not supported"))
+            }
+            syn::Type::Macro(..) => {
+                return Err(syn::Error::new(pat.span(), "Macro parameters not supported"))
+            }
+            syn::Type::Verbatim(..) => {
+                return Err(syn::Error::new(pat.span(), "Verbatim parameters not supported"))
+            }
+        }
+
         match map.get(&ty).cloned() {
             Some(types) => match types.as_slice() {
                 [c_ty] => Ok(vec![ArgCaptured { ty: c_ty.clone(), ..arg.clone() }.into()]),
@@ -136,5 +171,18 @@ pub struct Params {}
 impl Parse for Params {
     fn parse(_input: ParseStream) -> Result<Self, syn::Error> {
         Ok(Params {})
+    }
+}
+
+trait ErrorExt<T> {
+    fn context(self, msg: impl Display) -> Result<T, syn::Error>;
+}
+
+impl<T> ErrorExt<T> for Result<T, syn::Error> {
+    fn context(self, msg: impl Display) -> Self {
+        match self {
+            Err(err) => Err(syn::Error::new(err.span(), format!("{}: {}", msg, err.to_string()))),
+            x => x,
+        }
     }
 }

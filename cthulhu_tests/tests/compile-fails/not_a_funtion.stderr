@@ -1,0 +1,17 @@
+error: failed to invoke cthulhu: only supported on functions right now
+ --> $DIR/not_a_funtion.rs:2:1
+  |
+2 | struct Foo {}
+  | ^^^^^^
+
+error: failed to invoke cthulhu: only supported on functions right now
+ --> $DIR/not_a_funtion.rs:5:1
+  |
+5 | enum Foo {}
+  | ^^^^
+
+error: failed to invoke cthulhu: only supported on functions right now
+ --> $DIR/not_a_funtion.rs:8:1
+  |
+8 | union Foo {}
+  | ^^^^^
