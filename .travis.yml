@@ -1,0 +1,33 @@
+language: rust
+cache: cargo
+
+matrix:
+  include:
+  - rust: nightly
+    env: NAME=test-after-dark
+    before_script:
+    - rustup component add rustfmt
+    script:
+    - cargo test --all --verbose
+  - rust: 1.35.0
+    env: NAME=test
+    before_script:
+    - rustup component add rustfmt
+    script:
+    - cargo test --all --verbose
+  - rust: 1.35.0
+    env: NAME=pretty
+    before_script:
+    - rustup component add rustfmt
+    script:
+    - cargo fmt --all -- --check
+  - rust: 1.35.0
+    env: NAME=petty
+    before_script:
+    - rustup component add clippy
+    script:
+    - cargo clippy --all --all-targets --verbose
+
+notifications:
+  email:
+    on_success: never
