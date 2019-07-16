@@ -2,12 +2,16 @@ use cthulhu_calling::call_with;
 
 #[test]
 fn test_bool() {
-    let res = call_with(quote::quote! {}, quote::quote! {
-        fn some_shit(yes: bool) {}
-    }).unwrap();
+    let res = call_with(
+        quote::quote! {},
+        quote::quote! {
+            fn foo(yes: bool) {}
+        },
+    )
+    .unwrap();
     let expected = quote::quote! {
-        extern "C" fn some_shit(yes: ::std::os::raw::c_char) {
-            fn some_shit(yes: bool) {}
+        extern "C" fn foo(yes: ::std::os::raw::c_char) {
+            fn foo(yes: bool) {}
             unimplemented!()
         }
     };
@@ -16,12 +20,16 @@ fn test_bool() {
 
 #[test]
 fn test_u32() {
-    let res = call_with(quote::quote! {}, quote::quote! {
-        fn some_shit(num: u32) {}
-    }).unwrap();
+    let res = call_with(
+        quote::quote! {},
+        quote::quote! {
+            fn foo(num: u32) {}
+        },
+    )
+    .unwrap();
     let expected = quote::quote! {
-        extern "C" fn some_shit(num: ::std::os::raw::c_uint) {
-            fn some_shit(num: u32) {}
+        extern "C" fn foo(num: ::std::os::raw::c_uint) {
+            fn foo(num: u32) {}
             unimplemented!()
         }
     };
@@ -30,14 +38,17 @@ fn test_u32() {
 
 #[test]
 fn cstr() {
-    let res = call_with(quote::quote! {}, quote::quote! {
-        fn some_shit<'a>(string_maybe: &'a CStr) {}
-    }).unwrap();
+    let res = call_with(
+        quote::quote! {},
+        quote::quote! {
+            fn foo<'a>(input: &'a CStr) {}
+        },
+    )
+    .unwrap();
     let expected = quote::quote! {
-        extern "C" fn some_shit(le: *const ::std::os::raw::c_char, len: ::libc::size_t) {
-            fn some_shit<'a>(string_maybe: &'a CStr) {}
-            let (le, args) = oh_god(..);
-            some_shit(le, args)
+        extern "C" fn foo(input: *const ::std::os::raw::c_char) {
+            fn foo<'a>(input: &'a CStr) {}
+            unimplemented!()
         }
     };
     assert_eq!(res.to_string(), expected.to_string());
@@ -45,14 +56,17 @@ fn cstr() {
 
 #[test]
 fn arc_str() {
-    let res = call_with(quote::quote! {}, quote::quote! {
-        fn some_shit(string_maybe: Arc<str>) {}
-    }).unwrap();
+    let res = call_with(
+        quote::quote! {},
+        quote::quote! {
+            fn foo(input: Arc<str>) {}
+        },
+    )
+    .unwrap();
     let expected = quote::quote! {
-        extern "C" fn some_shit(le: *const ::std::os::raw::c_char, len: ::libc::size_t) {
-            fn some_shit(string_maybe: Arc<str>) {}
-            let (le, args) = oh_god(...);
-            some_shit(le, args)
+        extern "C" fn foo(input: *const ::std::os::raw::c_char, input_len: ::libc::size_t) {
+            fn foo(input: Arc<str>) {}
+            unimplemented!()
         }
     };
     assert_eq!(res.to_string(), expected.to_string());
