@@ -1,0 +1,17 @@
+[package]
+name = "cthulhu"
+description = "Macro for invoking cthulhu"
+version = "0.1.0"
+authors = ["Pascal Hertleif <pascal@technocreatives.com>"]
+edition = "2018"
+repository = "https://github.com/killercup/cthulhu"
+readme = "README.md"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = "0.15.39"
+quote = "0.6.13"
+proc-macro2 = "0.4.30"
+cthulhu_calling = { path = "../cthulhu_calling" }

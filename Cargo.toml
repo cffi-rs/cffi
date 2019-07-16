@@ -1,0 +1,6 @@
+[workspace]
+members = [
+  "cthulhu_calling",
+  "cthulhu_macro",
+  "cthulhu_tests",
+]

@@ -1,0 +1,14 @@
+[package]
+name = "cthulhu_calling"
+description = "Helps with calling Cthulhu"
+version = "0.1.0"
+authors = ["Pascal Hertleif <pascal@technocreatives.com>"]
+edition = "2018"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/killercup/cthulhu"
+readme = "README.md"
+
+[dependencies]
+syn = { version = "0.15.39", features = ["full", "extra-traits"] }
+quote = "0.6.13"
+proc-macro2 = "0.4.30"
