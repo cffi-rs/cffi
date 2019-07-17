@@ -8,17 +8,26 @@ Cthulhu without C!
 
 Invoke the hive mind of chaos by adding the `#[cthulhu]` to your function.
 
-### Supported automatic conversion
+### "Supported" automatic conversion
 
-- [ ] `bool` to `c_char`
-- [ ] Boring number conversions as defined in [`std::os::raw`](https://doc.rust-lang.org/1.36.0/std/os/raw/index.html)
-- [ ] `Arc<str>` to `*const char`
-- [ ] `&'a CStr` to `*const char`
-- [ ] `CString` to `*mut char`
+- [x] `bool` to `c_char`
+- [x] Boring number conversions as defined in [`std::os::raw`](https://doc.rust-lang.org/1.36.0/std/os/raw/index.html)
+- [x] `Arc<str>` to `(*const char, usize)`
+- [x] `&'a CStr` to `*const char`
+- [x] `CString` to `*mut char`
 
 Interesting reads:
 
 - [Marshaling Data with Platform Invoke](https://docs.microsoft.com/en-us/dotnet/framework/interop/marshaling-data-with-platform-invoke) (.NET)
+
+## Why?
+
+[@bbqsrc](https://github.com/bbqsrc) made me do it.
+You might even say it's [cursed](https://github.com/bbqsrc/cursed).
+
+## Is it any good?
+
+Oh my sweet summer child…
 
 ## License
 
