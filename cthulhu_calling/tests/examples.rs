@@ -11,6 +11,7 @@ fn test_bool() {
     )
     .unwrap();
     let expected = quote! {
+        #[no_mangle]
         extern "C" fn foo(yes: ::libc::c_char) {
             fn foo(yes: bool) {}
             unimplemented!()
@@ -29,6 +30,7 @@ fn test_u32() {
     )
     .unwrap();
     let expected = quote! {
+        #[no_mangle]
         extern "C" fn foo(num: ::libc::c_uint) {
             fn foo(num: u32) {}
             unimplemented!()
@@ -47,6 +49,7 @@ fn cstr() {
     )
     .unwrap();
     let expected = quote! {
+        #[no_mangle]
         extern "C" fn foo(input: *const ::libc::c_char) {
             fn foo<'a>(input: &'a CStr) {}
             unimplemented!()
@@ -65,6 +68,7 @@ fn arc_str() {
     )
     .unwrap();
     let expected = quote! {
+        #[no_mangle]
         extern "C" fn foo(input: *const ::libc::c_char, input_len: ::libc::size_t) {
             fn foo(input: Arc<str>) {}
             unimplemented!()

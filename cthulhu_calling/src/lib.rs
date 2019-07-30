@@ -35,6 +35,7 @@ pub fn call_with(
 
     let rust_fn = &raw_function;
     Ok(quote! {
+        #[no_mangle]
         extern "C" fn #name(#c_params) #return_type {
             #rust_fn
             unimplemented!()
