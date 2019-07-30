@@ -1,16 +1,17 @@
 use cthulhu_calling::call_with;
+use quote::quote;
 
 #[test]
 fn test_bool() {
     let res = call_with(
-        quote::quote! {},
-        quote::quote! {
+        quote! {},
+        quote! {
             fn foo(yes: bool) {}
         },
     )
     .unwrap();
-    let expected = quote::quote! {
-        extern "C" fn foo(yes: ::std::os::raw::c_char) {
+    let expected = quote! {
+        extern "C" fn foo(yes: ::libc::c_char) {
             fn foo(yes: bool) {}
             unimplemented!()
         }
@@ -21,14 +22,14 @@ fn test_bool() {
 #[test]
 fn test_u32() {
     let res = call_with(
-        quote::quote! {},
-        quote::quote! {
+        quote! {},
+        quote! {
             fn foo(num: u32) {}
         },
     )
     .unwrap();
-    let expected = quote::quote! {
-        extern "C" fn foo(num: ::std::os::raw::c_uint) {
+    let expected = quote! {
+        extern "C" fn foo(num: ::libc::c_uint) {
             fn foo(num: u32) {}
             unimplemented!()
         }
@@ -39,14 +40,14 @@ fn test_u32() {
 #[test]
 fn cstr() {
     let res = call_with(
-        quote::quote! {},
-        quote::quote! {
+        quote! {},
+        quote! {
             fn foo<'a>(input: &'a CStr) {}
         },
     )
     .unwrap();
-    let expected = quote::quote! {
-        extern "C" fn foo(input: *const ::std::os::raw::c_char) {
+    let expected = quote! {
+        extern "C" fn foo(input: *const ::libc::c_char) {
             fn foo<'a>(input: &'a CStr) {}
             unimplemented!()
         }
@@ -57,14 +58,14 @@ fn cstr() {
 #[test]
 fn arc_str() {
     let res = call_with(
-        quote::quote! {},
-        quote::quote! {
+        quote! {},
+        quote! {
             fn foo(input: Arc<str>) {}
         },
     )
     .unwrap();
-    let expected = quote::quote! {
-        extern "C" fn foo(input: *const ::std::os::raw::c_char, input_len: ::libc::size_t) {
+    let expected = quote! {
+        extern "C" fn foo(input: *const ::libc::c_char, input_len: ::libc::size_t) {
             fn foo(input: Arc<str>) {}
             unimplemented!()
         }

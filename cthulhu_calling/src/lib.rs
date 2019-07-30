@@ -149,20 +149,19 @@ macro_rules! map_types {
 }
 
 thread_local! {
-    /// This is an example for using doc comment attributes
     pub static TYPE_MAPPING: std::collections::HashMap<Type, Vec<Type>> = map_types![
-        bool => [::std::os::raw::c_char],
-        u8 => [::std::os::raw::c_uchar],
-        i8 => [::std::os::raw::c_char],
-        i16 => [::std::os::raw::c_short],
-        u16 => [::std::os::raw::c_ushort],
-        i32 => [::std::os::raw::c_int],
-        u32 => [::std::os::raw::c_uint],
-        i64 => [::std::os::raw::c_long],
-        u64 => [::std::os::raw::c_ulong],
-        &'a CStr => [*const ::std::os::raw::c_char],
-        CString => [*mut ::std::os::raw::c_char],
-        Arc<str> => [*const ::std::os::raw::c_char, ::libc::size_t],
+        bool => [::libc::c_char],
+        u8 => [::libc::c_uchar],
+        i8 => [::libc::c_char],
+        i16 => [::libc::c_short],
+        u16 => [::libc::c_ushort],
+        i32 => [::libc::c_int],
+        u32 => [::libc::c_uint],
+        i64 => [::libc::c_long],
+        u64 => [::libc::c_ulong],
+        &'a CStr => [*const ::libc::c_char],
+        CString => [*mut ::libc::c_char],
+        Arc<str> => [*const ::libc::c_char, ::libc::size_t],
     ];
 }
 
