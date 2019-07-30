@@ -11,4 +11,4 @@ cthulhu_calling = { path = "../cthulhu_calling/" }
 cthulhu = { path = "../cthulhu_macro/" }
 
 [dev-dependencies]
-trybuild = "1.0.7"
+trybuild = "1.0.9"
