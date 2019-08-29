@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 cthulhu_calling = { path = "../cthulhu_calling/" }
 cthulhu = { path = "../cthulhu_macro/" }
-libc = "*"
+libc = "0.2.62"
 
 [dev-dependencies]
-trybuild = "1.0.9"
+trybuild = "1.0.11"

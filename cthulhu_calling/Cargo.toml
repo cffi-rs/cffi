@@ -9,7 +9,7 @@ repository = "https://github.com/killercup/cthulhu"
 readme = "README.md"
 
 [dependencies]
-syn = { version = "0.15.39", features = ["full", "extra-traits"] }
-quote = "0.6.13"
-proc-macro2 = "0.4.30"
-libc = "0.2.60"
+syn = { version = "1.0.5", features = ["full", "extra-traits"] }
+quote = "1.0.2"
+proc-macro2 = "1.0.1"
+libc = "0.2.62"

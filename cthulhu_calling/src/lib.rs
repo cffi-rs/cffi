@@ -5,7 +5,7 @@ use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
-    ArgCaptured, FnArg, Type,
+    PatType, FnArg, Type,
 };
 
 pub fn call_with(
@@ -25,8 +25,7 @@ pub fn call_with(
         }
     };
 
-    let syn::ItemFn { ident: ref name, ref decl, .. } = fn_item.clone();
-    let syn::FnDecl { inputs: ref params, output: ref return_type, .. } = *decl.clone();
+    let syn::Signature { ident: ref name, inputs: ref params, output: ref return_type, .. } = fn_item.sig.clone();
 
     let mut c_params: Punctuated<FnArg, syn::Token![,]> = Punctuated::new();
     for param in params {
@@ -45,15 +44,15 @@ pub fn call_with(
 
 fn to_c_param(arg: &FnArg) -> Result<Vec<FnArg>, syn::Error> {
     match arg {
-        FnArg::Captured(arg) => to_c_type(arg),
+        FnArg::Typed(arg) => to_c_type(arg),
         x => Ok(vec![x.clone()]),
     }
 }
 
-fn to_c_type(arg: &ArgCaptured) -> Result<Vec<FnArg>, syn::Error> {
+fn to_c_type(arg: &PatType) -> Result<Vec<FnArg>, syn::Error> {
     TYPE_MAPPING.with(|map| {
-        let ArgCaptured { ty, pat, .. } = arg.clone();
-        match &ty {
+        let PatType { ty, pat, .. } = arg.clone();
+        match &*ty {
             syn::Type::Path(..) | syn::Type::Reference(..) => {}
 
             syn::Type::Slice(..) => {
@@ -95,13 +94,16 @@ fn to_c_type(arg: &ArgCaptured) -> Result<Vec<FnArg>, syn::Error> {
             syn::Type::Verbatim(..) => {
                 return Err(syn::Error::new(pat.span(), "Verbatim parameters not supported"))
             }
+            _ => {
+                return Err(syn::Error::new(pat.span(), "Unknown parameters not supported"))
+            }
         }
 
         match map.get(&ty).cloned() {
             Some(types) => match types.as_slice() {
-                [c_ty] => Ok(vec![ArgCaptured { ty: c_ty.clone(), ..arg.clone() }.into()]),
+                [c_ty] => Ok(vec![PatType { ty: Box::new(c_ty.clone()), ..arg.clone() }.into()]),
                 [c_ty, len] => {
-                    let name = if let syn::Pat::Ident(syn::PatIdent { ident, .. }) = pat {
+                    let name = if let syn::Pat::Ident(syn::PatIdent { ident, .. }) = *pat {
                         let mut name = ident.to_string();
                         name.push_str("_len");
                         syn::Ident::new(&name, ident.span())
@@ -112,16 +114,16 @@ fn to_c_type(arg: &ArgCaptured) -> Result<Vec<FnArg>, syn::Error> {
                         ));
                     };
                     Ok(vec![
-                        ArgCaptured { ty: c_ty.clone(), ..arg.clone() }.into(),
-                        ArgCaptured {
-                            pat: syn::PatIdent {
+                        PatType { ty: Box::new(c_ty.clone()), ..arg.clone() }.into(),
+                        PatType {
+                            pat: Box::new(syn::Pat::Ident(syn::PatIdent {
                                 ident: name,
+                                attrs: vec![],
                                 by_ref: None,
                                 mutability: None,
                                 subpat: None,
-                            }
-                            .into(),
-                            ty: len.clone(),
+                            })),
+                            ty: Box::new(len.clone()),
                             ..arg.clone()
                         }
                         .into(),
