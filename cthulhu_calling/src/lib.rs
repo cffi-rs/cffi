@@ -8,6 +8,95 @@ use syn::{
     PatType, FnArg, Type,
 };
 
+fn collect_mappings_from_sig(sig: &mut syn::Signature) -> Result<Vec<(&mut PatType, Option<syn::Ident>)>, syn::Error> {
+    if let Some(syn::FnArg::Receiver(item)) = sig.inputs.first() {
+        return Err(syn::Error::new(item.span(), "Cannot support self"));
+    }
+
+    let attrs = sig.inputs.iter_mut()
+        .filter_map(|x| {
+            match x {
+                syn::FnArg::Typed(t) => Some(t),
+                _ => None
+            }
+        })
+        .map(|input| {
+            let mut unhandled_attrs = vec![];
+
+            std::mem::swap(&mut input.attrs, &mut unhandled_attrs);
+
+            let mut idents = unhandled_attrs.into_iter().filter_map(|item| {
+                // Try to get the item as a Meta
+                let meta = match item.parse_meta() {
+                    Ok(v) => v,
+                    Err(e) => {
+                        eprintln!("Meta yolo: {:?}: {:?}", &item, e);
+                        input.attrs.push(item);
+                        return None;
+                    }
+                };
+
+                let list = match meta {
+                    syn::Meta::List(list) => list,
+                    _ => {
+                        input.attrs.push(item);
+                        return None;
+                    }
+                };
+
+                if list.nested.len() > 1 {
+                    // TODO: throw proper error
+                    input.attrs.push(item);
+                    return None;
+                }
+
+                let marshaler = match list.nested.first() {
+                    Some(syn::NestedMeta::Meta(syn::Meta::Path(v))) => v,
+                    _ => {
+                        // TODO: throw proper error
+                        input.attrs.push(item);
+                        return None;
+                    }
+                };
+
+                let ident = match marshaler.get_ident() {
+                    Some(v) => v.to_owned(),
+                    None => {
+                        // TODO: throw proper error
+                        input.attrs.push(item);
+                        return None;
+                    }
+                };
+                
+                Some(ident)
+            }).collect::<Vec<_>>();
+
+            if idents.len() > 1 {
+                // TODO: have a very strong, negative opinion.
+            }
+
+            (input, idents.pop())
+        })
+        .collect::<Vec<_>>();
+
+    Ok(attrs)
+}
+
+fn process_function(mut func: syn::ItemFn) -> Result<syn::ItemFn, syn::Error> {
+
+    // Check function for "returns"
+    // TODO
+
+    // Dig into inputs
+    let marshal_attrs = collect_mappings_from_sig(&mut func.sig)?;
+    println!("{:?}", &marshal_attrs.iter().map(|x| {
+        let ty = &x.0;
+        (quote! { #ty }.to_string(), &x.1)
+    }).collect::<Vec<_>>());
+
+    Ok(func)
+}
+
 pub fn call_with(
     params: TokenStream,
     raw_function: TokenStream,
@@ -16,7 +105,7 @@ pub fn call_with(
     let function: syn::Item =
         syn::parse2(raw_function.clone()).context("error parsing function body")?;
     let fn_item = match function {
-        syn::Item::Fn(f) => f,
+        syn::Item::Fn(f) => process_function(f)?,
         _ => {
             return Err(syn::Error::new_spanned(
                 &raw_function,
