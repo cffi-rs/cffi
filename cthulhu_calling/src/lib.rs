@@ -1,100 +1,205 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use std::fmt::Display;
+use std::{error::Error, fmt::Display, marker::PhantomData, sync::Arc};
 use syn::{
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
-    PatType, FnArg, Type,
+    FnArg, Pat, PatType, Type,
 };
 
-fn collect_mappings_from_sig(sig: &mut syn::Signature) -> Result<Vec<(&mut PatType, Option<syn::Ident>)>, syn::Error> {
+pub trait ToForeign<Local, Foreign>: Sized {
+    type Error;
+    fn to_foreign(_: Local) -> Result<Foreign, Self::Error>;
+    fn drop_foreign(_: Foreign) {}
+}
+
+pub trait FromForeign<Foreign, Local>: Sized {
+    type Error;
+    fn from_foreign(_: Foreign) -> Result<Local, Self::Error>;
+    fn drop_local(_: Local) {}
+}
+
+struct BoxMarshaler<T>(PhantomData<T>);
+
+impl<T> FromForeign<*mut T, Box<T>> for BoxMarshaler<T> {
+    type Error = Box<dyn Error>;
+
+    #[inline(always)]
+    fn from_foreign(box_ptr: *mut T) -> Result<Box<T>, Self::Error> {
+        if box_ptr.is_null() {
+            // TODO: error
+        }
+
+        Ok(unsafe { Box::from_raw(box_ptr) })
+    }
+}
+
+impl<T> ToForeign<Box<T>, *mut T> for BoxMarshaler<T> {
+    type Error = Box<dyn Error>;
+
+    #[inline(always)]
+    fn to_foreign(boxed: Box<T>) -> Result<*mut T, Self::Error> {
+        Ok(Box::into_raw(boxed))
+    }
+}
+
+struct ArcMarshaler<T>(PhantomData<T>);
+
+impl<T> FromForeign<*const T, Arc<T>> for ArcMarshaler<T> {
+    type Error = Arc<dyn Error>;
+
+    #[inline(always)]
+    fn from_foreign(arc_ptr: *const T) -> Result<Arc<T>, Self::Error> {
+        if arc_ptr.is_null() {
+            // TODO: error
+        }
+
+        Ok(unsafe { Arc::from_raw(arc_ptr) })
+    }
+}
+
+impl<T> ToForeign<Arc<T>, *const T> for ArcMarshaler<T> {
+    type Error = Arc<dyn Error>;
+
+    #[inline(always)]
+    fn to_foreign(arced: Arc<T>) -> Result<*const T, Self::Error> {
+        Ok(Arc::into_raw(arced))
+    }
+}
+
+struct BoolMarshaler;
+
+impl FromForeign<u8, bool> for BoolMarshaler {
+    type Error = std::convert::Infallible;
+
+    #[inline(always)]
+    fn from_foreign(i: u8) -> Result<bool, Self::Error> {
+        Ok(i != 0)
+    }
+}
+
+use std::{
+    borrow::Cow,
+    ffi::{CStr, CString},
+};
+
+struct StrMarshaler<'a>(&'a PhantomData<()>);
+
+impl<'a> FromForeign<*const libc::c_char, Cow<'a, str>> for StrMarshaler<'a> {
+    type Error = Box<dyn Error>;
+
+    fn from_foreign(key: *const libc::c_char) -> Result<Cow<'a, str>, Self::Error> {
+        Ok(unsafe { CStr::from_ptr(key) }.to_string_lossy())
+    }
+}
+
+impl<'a> ToForeign<&'a str, *const libc::c_char> for StrMarshaler<'a> {
+    type Error = Box<dyn Error>;
+
+    fn to_foreign(input: &'a str) -> Result<*const libc::c_char, Self::Error> {
+        let c_str = CString::new(input)?;
+        Ok(c_str.into_raw())
+    }
+
+    fn drop_foreign(ptr: *const libc::c_char) {
+        unsafe { CString::from_raw(ptr as *mut _) };
+    }
+}
+
+impl ToForeign<bool, u8> for BoolMarshaler {
+    type Error = std::convert::Infallible;
+
+    #[inline(always)]
+    fn to_foreign(b: bool) -> Result<u8, Self::Error> {
+        Ok(if b { 1 } else { 0 })
+    }
+}
+
+fn collect_mappings_from_sig(
+    sig: &mut syn::Signature,
+) -> Result<Vec<(PatType, Option<syn::Path>)>, syn::Error> {
     if let Some(syn::FnArg::Receiver(item)) = sig.inputs.first() {
         return Err(syn::Error::new(item.span(), "Cannot support self"));
     }
 
-    let attrs = sig.inputs.iter_mut()
-        .filter_map(|x| {
-            match x {
-                syn::FnArg::Typed(t) => Some(t),
-                _ => None
-            }
+    let attrs = sig
+        .inputs
+        .iter_mut()
+        .filter_map(|x| match x {
+            syn::FnArg::Typed(t) => Some(t),
+            _ => None,
         })
         .map(|input| {
             let mut unhandled_attrs = vec![];
 
             std::mem::swap(&mut input.attrs, &mut unhandled_attrs);
 
-            let mut idents = unhandled_attrs.into_iter().filter_map(|item| {
-                // Try to get the item as a Meta
-                let meta = match item.parse_meta() {
-                    Ok(v) => v,
-                    Err(e) => {
-                        eprintln!("Meta yolo: {:?}: {:?}", &item, e);
-                        input.attrs.push(item);
-                        return None;
-                    }
-                };
+            let mut idents = unhandled_attrs
+                .into_iter()
+                .filter_map(|item| {
+                    // Try to get the item as a Meta
+                    let meta = match item.parse_meta() {
+                        Ok(v) => v,
+                        Err(e) => {
+                            eprintln!("Meta yolo: {:?}: {:?}", &item, e);
+                            input.attrs.push(item);
+                            return None;
+                        }
+                    };
 
-                let list = match meta {
-                    syn::Meta::List(list) => list,
-                    _ => {
-                        input.attrs.push(item);
-                        return None;
-                    }
-                };
+                    let list = match meta {
+                        syn::Meta::List(list) => list,
+                        _ => {
+                            input.attrs.push(item);
+                            return None;
+                        }
+                    };
 
-                if list.nested.len() > 1 {
-                    // TODO: throw proper error
-                    input.attrs.push(item);
-                    return None;
-                }
-
-                let marshaler = match list.nested.first() {
-                    Some(syn::NestedMeta::Meta(syn::Meta::Path(v))) => v,
-                    _ => {
+                    if list.nested.len() > 1 {
                         // TODO: throw proper error
                         input.attrs.push(item);
                         return None;
                     }
-                };
 
-                let ident = match marshaler.get_ident() {
-                    Some(v) => v.to_owned(),
-                    None => {
-                        // TODO: throw proper error
-                        input.attrs.push(item);
-                        return None;
-                    }
-                };
-                
-                Some(ident)
-            }).collect::<Vec<_>>();
+                    let marshaler = match list.nested.first() {
+                        Some(syn::NestedMeta::Meta(syn::Meta::Path(v))) => v,
+                        _ => {
+                            // TODO: throw proper error
+                            input.attrs.push(item);
+                            return None;
+                        }
+                    };
+
+                    Some(marshaler.to_owned())
+                })
+                .collect::<Vec<_>>();
 
             if idents.len() > 1 {
                 // TODO: have a very strong, negative opinion.
             }
 
-            (input, idents.pop())
+            (input.to_owned(), idents.pop())
+        })
+        .map(|x| {
+            let default_marshaler = DEFAULT_MARSHALERS.with(|map| map.get(&x.0.ty).map(|x| x.clone()));
+            (x.0, x.1.or_else(|| default_marshaler))
         })
         .collect::<Vec<_>>();
 
     Ok(attrs)
 }
 
-fn process_function(mut func: syn::ItemFn) -> Result<syn::ItemFn, syn::Error> {
-
+fn process_function(
+    mut func: syn::ItemFn,
+) -> Result<(syn::ItemFn, Vec<(PatType, Option<syn::Path>)>), syn::Error> {
     // Check function for "returns"
     // TODO
 
     // Dig into inputs
     let marshal_attrs = collect_mappings_from_sig(&mut func.sig)?;
-    println!("{:?}", &marshal_attrs.iter().map(|x| {
-        let ty = &x.0;
-        (quote! { #ty }.to_string(), &x.1)
-    }).collect::<Vec<_>>());
 
-    Ok(func)
+    Ok((func, marshal_attrs))
 }
 
 pub fn call_with(
@@ -104,7 +209,7 @@ pub fn call_with(
     let _params: Params = syn::parse2(params.clone()).context("error parsing params")?;
     let function: syn::Item =
         syn::parse2(raw_function.clone()).context("error parsing function body")?;
-    let fn_item = match function {
+    let (fn_item, marshalers) = match function {
         syn::Item::Fn(f) => process_function(f)?,
         _ => {
             return Err(syn::Error::new_spanned(
@@ -114,113 +219,84 @@ pub fn call_with(
         }
     };
 
-    let syn::Signature { ident: ref name, inputs: ref params, output: ref return_type, .. } = fn_item.sig.clone();
+    let syn::Signature { ident: ref name, inputs: ref params, output: ref return_type, .. } =
+        fn_item.sig.clone();
 
-    let mut c_params: Punctuated<FnArg, syn::Token![,]> = Punctuated::new();
-    for param in params {
-        c_params.extend(to_c_param(param).context("failed to convert Rust type to FFI type")?);
+    let mut from_foreigns = TokenStream::new();
+    let mut c_params: Punctuated<PatType, syn::Token![,]> = Punctuated::new();
+    let mut c_args: Punctuated<Pat, syn::Token![,]> = Punctuated::new();
+
+    for (i, param) in params.iter().enumerate() {
+        let (out_type, marshaler) = &marshalers[i];
+        let name = to_c_arg(param).context("failed to convert Rust type to FFI type")?;
+        let in_type = to_c_param(param).context("failed to convert Rust type to FFI type")?;
+
+        if let Some(marshaler) = marshaler {
+            let foreign = gen_foreign(&marshaler, &*in_type.ty, &*out_type.ty, &name);
+            from_foreigns.extend(foreign);
+        }
+
+        c_params.push(in_type);
+        c_args.push(name);
     }
 
     let rust_fn = &raw_function;
+    
     Ok(quote! {
         #[no_mangle]
         extern "C" fn #name(#c_params) #return_type {
+            #from_foreigns
+
             #rust_fn
-            unimplemented!()
+
+            let result = #name(#c_args);
+            // #to_foreigns
         }
     })
 }
 
-fn to_c_param(arg: &FnArg) -> Result<Vec<FnArg>, syn::Error> {
+fn to_c_param(arg: &FnArg) -> Result<PatType, syn::Error> {
     match arg {
         FnArg::Typed(arg) => to_c_type(arg),
-        x => Ok(vec![x.clone()]),
+        x => Err(syn::Error::new(arg.span(), "cannot")),
     }
 }
 
-fn to_c_type(arg: &PatType) -> Result<Vec<FnArg>, syn::Error> {
+fn to_c_arg(arg: &FnArg) -> Result<Pat, syn::Error> {
+    match arg {
+        FnArg::Typed(arg) => Ok(*arg.pat.clone()),
+        x => Err(syn::Error::new(arg.span(), "cannot")),
+    }
+}
+
+fn gen_foreign(
+    marshaler: &syn::Path,
+    in_type: &syn::Type,
+    out_type: &syn::Type,
+    name: &syn::Pat,
+) -> TokenStream {
+    quote! {
+        let #name = #marshaler::<#in_type, #out_type>::from_foreign(#name);
+    }
+}
+
+fn to_c_type(arg: &PatType) -> Result<PatType, syn::Error> {
     TYPE_MAPPING.with(|map| {
         let PatType { ty, pat, .. } = arg.clone();
         match &*ty {
             syn::Type::Path(..) | syn::Type::Reference(..) => {}
-
-            syn::Type::Slice(..) => {
-                return Err(syn::Error::new(pat.span(), "Slice parameters not supported"))
-            }
-            syn::Type::Array(..) => {
-                return Err(syn::Error::new(pat.span(), "Array parameters not supported"))
-            }
-            syn::Type::Ptr(..) => {
-                return Err(syn::Error::new(pat.span(), "Ptr parameters not supported"))
-            }
-            syn::Type::BareFn(..) => {
-                return Err(syn::Error::new(pat.span(), "BareFn parameters not supported"))
-            }
-            syn::Type::Never(..) => {
-                return Err(syn::Error::new(pat.span(), "Never parameters not supported"))
-            }
-            syn::Type::Tuple(..) => {
-                return Err(syn::Error::new(pat.span(), "Tuple parameters not supported"))
-            }
-            syn::Type::TraitObject(..) => {
-                return Err(syn::Error::new(pat.span(), "TraitObject parameters not supported"))
-            }
-            syn::Type::ImplTrait(..) => {
-                return Err(syn::Error::new(pat.span(), "ImplTrait parameters not supported"))
-            }
-            syn::Type::Paren(..) => {
-                return Err(syn::Error::new(pat.span(), "Paren parameters not supported"))
-            }
-            syn::Type::Group(..) => {
-                return Err(syn::Error::new(pat.span(), "Group parameters not supported"))
-            }
-            syn::Type::Infer(..) => {
-                return Err(syn::Error::new(pat.span(), "Infer parameters not supported"))
-            }
-            syn::Type::Macro(..) => {
-                return Err(syn::Error::new(pat.span(), "Macro parameters not supported"))
-            }
-            syn::Type::Verbatim(..) => {
-                return Err(syn::Error::new(pat.span(), "Verbatim parameters not supported"))
-            }
-            _ => {
-                return Err(syn::Error::new(pat.span(), "Unknown parameters not supported"))
-            }
+            _ => return Err(syn::Error::new(pat.span(), "Unknown parameters not supported")),
         }
 
         match map.get(&ty).cloned() {
             Some(types) => match types.as_slice() {
-                [c_ty] => Ok(vec![PatType { ty: Box::new(c_ty.clone()), ..arg.clone() }.into()]),
-                [c_ty, len] => {
-                    let name = if let syn::Pat::Ident(syn::PatIdent { ident, .. }) = *pat {
-                        let mut name = ident.to_string();
-                        name.push_str("_len");
-                        syn::Ident::new(&name, ident.span())
-                    } else {
-                        return Err(syn::Error::new(
-                            pat.span(),
-                            "pattern as parameters not supported",
-                        ));
-                    };
-                    Ok(vec![
-                        PatType { ty: Box::new(c_ty.clone()), ..arg.clone() }.into(),
-                        PatType {
-                            pat: Box::new(syn::Pat::Ident(syn::PatIdent {
-                                ident: name,
-                                attrs: vec![],
-                                by_ref: None,
-                                mutability: None,
-                                subpat: None,
-                            })),
-                            ty: Box::new(len.clone()),
-                            ..arg.clone()
-                        }
-                        .into(),
-                    ])
-                }
+                [c_ty] => Ok(PatType { ty: Box::new(c_ty.clone()), ..arg.clone() }.into()),
                 _ => unreachable!(),
             },
-            None => Ok(vec![arg.clone().into()]),
+            None => {
+                let c_ty: Type = syn::parse2(quote! { *const ::libc::c_void }).unwrap();
+                Ok(PatType { ty: Box::new(c_ty.clone()), ..arg.clone() }.into())
+            }
         }
     })
 }
@@ -240,9 +316,30 @@ macro_rules! map_types {
     }}
 }
 
+macro_rules! map_marshalers {
+    [$($rust:ty => $c:ty,)*] => {{
+        let mut map = std::collections::HashMap::<Type, syn::Path>::new();
+        $(map.insert(
+            syn::parse2(quote!{ $rust })
+                .expect(concat!("cannot parse", stringify!($rust), "as type")),
+
+            syn::parse2(quote!{ $c })
+                .expect(concat!("cannot parse", stringify!($c), "as path")),
+
+        );)*
+        map
+    }}
+}
+
 thread_local! {
+    pub static DEFAULT_MARSHALERS: std::collections::HashMap<Type, syn::Path> = map_marshalers![
+        bool => ::BoolMarshaler,
+        Arc<T> => ::ArcMarshaler,
+        Box<T> => ::BoxMarshaler,
+    ];
+
     pub static TYPE_MAPPING: std::collections::HashMap<Type, Vec<Type>> = map_types![
-        bool => [::libc::c_char],
+        bool => [u8],
         u8 => [::libc::c_uchar],
         i8 => [::libc::c_char],
         i16 => [::libc::c_short],
@@ -251,9 +348,10 @@ thread_local! {
         u32 => [::libc::c_uint],
         i64 => [::libc::c_long],
         u64 => [::libc::c_ulong],
+        &'a str => [*const ::libc::c_char],
         &'a CStr => [*const ::libc::c_char],
         CString => [*mut ::libc::c_char],
-        Arc<str> => [*const ::libc::c_char, ::libc::size_t],
+        // Arc<str> => [*const ::libc::c_char, ::libc::size_t],
     ];
 }
 
