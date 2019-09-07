@@ -54,7 +54,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "cthulhu"
 version = "0.1.0"
 dependencies = [
- "cthulhu_calling 0.1.0",
+ "assert_tokens_eq 0.1.0 (git+https://github.com/killercup/assert_tokens_eq)",
+ "cthulhu_macro 0.1.0",
  "darling 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "proc-macro2 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -62,7 +63,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "cthulhu_calling"
+name = "cthulhu_macro"
 version = "0.1.0"
 dependencies = [
  "assert_tokens_eq 0.1.0 (git+https://github.com/killercup/assert_tokens_eq)",
@@ -78,7 +79,7 @@ name = "cthulhu_tests"
 version = "0.1.0"
 dependencies = [
  "cthulhu 0.1.0",
- "cthulhu_calling 0.1.0",
+ "cursed 0.1.0",
  "darling 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.62 (registry+https://github.com/rust-lang/crates.io-index)",
  "trybuild 1.0.11 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -91,6 +92,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "syn 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "cursed"
+version = "0.1.0"
+dependencies = [
+ "libc 0.2.62 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

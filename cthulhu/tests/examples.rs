@@ -1,4 +1,4 @@
-use cthulhu_calling::{call_with, InvokeParams};
+use cthulhu_macro::{call_with, InvokeParams};
 use quote::quote;
 use assert_tokens_eq::assert_tokens_eq;
 
@@ -13,8 +13,8 @@ fn test_bool() {
     .unwrap();
     let expected = quote! {
         #[no_mangle]
-        extern "C" fn foo(yes: u8, __exception: ::cthulhu::ErrCallback) {
-            let yes = ::cthulhu::try_not_null!(::cthulhu::BoolMarshaler::from_foreign(yes), __exception);
+        extern "C" fn foo(yes: u8, __exception: ::cursed::ErrCallback) {
+            let yes = ::cursed::try_not_null!(::cursed::BoolMarshaler::from_foreign(yes), __exception);
             fn foo(yes: bool) {}
             foo(yes);
         }
@@ -75,8 +75,8 @@ fn arc_str() {
     .unwrap();
     let expected = quote! {
         #[no_mangle]
-        extern "C" fn foo(input: *const ::libc::c_char, __exception: ::cthulhu::ErrCallback) {
-            let input = ::cthulhu::try_not_null!(::cthulhu::ArcMarshaler<str>::from_foreign(input), __exception);
+        extern "C" fn foo(input: *const ::libc::c_char, __exception: ::cursed::ErrCallback) {
+            let input = ::cursed::try_not_null!(::cursed::ArcMarshaler<str>::from_foreign(input), __exception);
             fn foo(input: Arc<str>) {}
             foo(input);
         }
@@ -110,17 +110,17 @@ fn custom_json() {
         extern "C" fn foo(
             input: *const ::libc::c_void,
             input2: *const ::libc::c_void,
-            __exception: ::cthulhu::ErrCallback,
+            __exception: ::cursed::ErrCallback,
         ) -> u8 {
-            let input = ::cthulhu::try_not_null!(CustomJsonMarshaler::from_foreign(input), __exception, u8);
-            let input2 = ::cthulhu::try_not_null!(CustomOtherMarshaler::from_foreign(input2), __exception, u8);
+            let input = ::cursed::try_not_null!(CustomJsonMarshaler::from_foreign(input), __exception, u8);
+            let input2 = ::cursed::try_not_null!(CustomOtherMarshaler::from_foreign(input2), __exception, u8);
             fn foo(input: &TestStruct, input2: &TestStruct) -> bool {
                 input == input2
             }
             let result = foo(input, input2);
-            match ::cthulhu::BoolMarshaler::to_foreign(result) {
+            match ::cursed::BoolMarshaler::to_foreign(result) {
                 Ok(v) => v,
-                Err(e) => ::cthulhu::throw!(e, u8),
+                Err(e) => ::cursed::throw!(e, u8),
             }
         }
     };
@@ -132,7 +132,7 @@ fn return_marshaler() {
     let res = call_with(
         InvokeParams {
             return_marshaler: Some(
-                syn::parse2(quote! { ::cthulhu::BoolMarshaler }).unwrap()
+                syn::parse2(quote! { ::cursed::BoolMarshaler }).unwrap()
             )
         },
         quote! {
@@ -147,15 +147,15 @@ fn return_marshaler() {
         extern "C" fn foo(
             input: *const ::libc::c_char,
             input2: *const ::libc::c_char,
-            __exception: ::cthulhu::ErrCallback,
+            __exception: ::cursed::ErrCallback,
         ) -> u8 {
-            let input = ::cthulhu::try_not_null!(
-                ::cthulhu::StrMarshaler::from_foreign(input),
+            let input = ::cursed::try_not_null!(
+                ::cursed::StrMarshaler::from_foreign(input),
                 __exception,
                 u8
             );
-            let input2 = ::cthulhu::try_not_null!(
-                ::cthulhu::StrMarshaler::from_foreign(input2),
+            let input2 = ::cursed::try_not_null!(
+                ::cursed::StrMarshaler::from_foreign(input2),
                 __exception,
                 u8
             );
@@ -163,9 +163,9 @@ fn return_marshaler() {
                 input == input2
             }
             let result = foo(input, input2);
-            match ::cthulhu::BoolMarshaler::to_foreign(result) {
+            match ::cursed::BoolMarshaler::to_foreign(result) {
                 Ok(v) => v,
-                Err(e) => ::cthulhu::throw!(e, u8)
+                Err(e) => ::cursed::throw!(e, u8)
             }
         }
     };

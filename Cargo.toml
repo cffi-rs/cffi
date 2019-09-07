@@ -1,6 +1,6 @@
 [workspace]
 members = [
-  "cthulhu_calling",
-  "cthulhu_macro",
+  "cursed",
+  "cthulhu",
   "cthulhu_tests",
 ]
