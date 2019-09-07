@@ -1,5 +1,6 @@
 use cthulhu_calling::call_with;
 use quote::quote;
+use assert_tokens_eq::assert_tokens_eq;
 
 #[test]
 fn test_bool() {
@@ -17,7 +18,7 @@ fn test_bool() {
             unimplemented!()
         }
     };
-    assert_eq!(res.to_string(), expected.to_string());
+    assert_tokens_eq!(res, expected);
 }
 
 #[test]
@@ -36,7 +37,7 @@ fn test_u32() {
             unimplemented!()
         }
     };
-    assert_eq!(res.to_string(), expected.to_string());
+    assert_tokens_eq!(res, expected);
 }
 
 #[test]
@@ -55,7 +56,7 @@ fn cstr() {
             unimplemented!()
         }
     };
-    assert_eq!(res.to_string(), expected.to_string());
+    assert_tokens_eq!(res, expected);
 }
 
 #[test]
@@ -74,5 +75,5 @@ fn arc_str() {
             unimplemented!()
         }
     };
-    assert_eq!(res.to_string(), expected.to_string());
+    assert_tokens_eq!(res, expected);
 }
