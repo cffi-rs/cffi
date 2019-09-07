@@ -14,7 +14,7 @@ fn test_bool() {
     let expected = quote! {
         #[no_mangle]
         extern "C" fn foo(yes: u8, __exception: ::cthulhu::ErrCallback) {
-            let yes = ::cthulhu::try!(::cthulhu::BoolMarshaler::from_foreign(yes), __exception);
+            let yes = ::cthulhu::try_not_null!(::cthulhu::BoolMarshaler::from_foreign(yes), __exception);
             fn foo(yes: bool) {}
             foo(yes);
         }
@@ -35,7 +35,7 @@ fn test_u32() {
         #[no_mangle]
         extern "C" fn foo(num: ::libc::c_uint) {
             fn foo(num: u32) {}
-            unimplemented!()
+            foo(num);
         }
     };
     assert_tokens_eq!(res, expected);
@@ -58,27 +58,7 @@ fn test_u32_return() {
             fn foo(num: u32) -> u32 {
                 num + 42
             }
-            let result = foo(num);
-            result
-        }
-    };
-    assert_eq!(res.to_string(), expected.to_string());
-}
-
-#[test]
-fn cstr() {
-    let res = call_with(
-        InvokeParams::default(),
-        quote! {
-            fn foo<'a>(input: &'a CStr) {}
-        },
-    )
-    .unwrap();
-    let expected = quote! {
-        #[no_mangle]
-        extern "C" fn foo(input: *const ::libc::c_char) {
-            fn foo<'a>(input: &'a CStr) {}
-            unimplemented!()
+            foo(num)
         }
     };
     assert_tokens_eq!(res, expected);
@@ -95,9 +75,10 @@ fn arc_str() {
     .unwrap();
     let expected = quote! {
         #[no_mangle]
-        extern "C" fn foo(input: *const ::libc::c_char, input_len: ::libc::size_t) {
+        extern "C" fn foo(input: *const ::libc::c_char, __exception: ::cthulhu::ErrCallback) {
+            let input = ::cthulhu::try_not_null!(::cthulhu::ArcMarshaler<str>::from_foreign(input), __exception);
             fn foo(input: Arc<str>) {}
-            unimplemented!()
+            foo(input);
         }
     };
     assert_tokens_eq!(res, expected);
@@ -131,8 +112,8 @@ fn custom_json() {
             input2: *const ::libc::c_void,
             __exception: ::cthulhu::ErrCallback,
         ) -> u8 {
-            let input = ::cthulhu::try!(CustomJsonMarshaler::from_foreign(input), __exception, u8);
-            let input2 = ::cthulhu::try!(CustomOtherMarshaler::from_foreign(input2), __exception, u8);
+            let input = ::cthulhu::try_not_null!(CustomJsonMarshaler::from_foreign(input), __exception, u8);
+            let input2 = ::cthulhu::try_not_null!(CustomOtherMarshaler::from_foreign(input2), __exception, u8);
             fn foo(input: &TestStruct, input2: &TestStruct) -> bool {
                 input == input2
             }
@@ -147,7 +128,7 @@ fn custom_json() {
 }
 
 #[test]
-fn wat() {
+fn return_marshaler() {
     let res = call_with(
         InvokeParams {
             return_marshaler: Some(
@@ -168,12 +149,12 @@ fn wat() {
             input2: *const ::libc::c_char,
             __exception: ::cthulhu::ErrCallback,
         ) -> u8 {
-            let input = ::cthulhu::try!(
+            let input = ::cthulhu::try_not_null!(
                 ::cthulhu::StrMarshaler::from_foreign(input),
                 __exception,
                 u8
             );
-            let input2 = ::cthulhu::try!(
+            let input2 = ::cthulhu::try_not_null!(
                 ::cthulhu::StrMarshaler::from_foreign(input2),
                 __exception,
                 u8

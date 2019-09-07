@@ -1,5 +1,5 @@
 error: failed to invoke cthulhu: failed to convert Rust type to FFI type: Tuple parameters not supported
- --> $DIR/pattern_params.rs:2:8
+ --> $DIR/pattern_params.rs:2:18
   |
 2 | fn foo((_a, _b): (i32, bool)) {}
-  |        ^^^^^^^^
+  |                  ^^^^^^^^^^^

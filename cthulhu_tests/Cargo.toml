@@ -1,15 +1,18 @@
 [package]
 name = "cthulhu_tests"
 version = "0.1.0"
-authors = ["Pascal Hertleif <pascal@technocreatives.com>"]
+authors = [
+  "Brendan Molloy <brendan@bbqsrc.net>",
+  "Pascal Hertleif <pascal@technocreatives.com>"
+]
+license = "MIT OR Apache-2.0"
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 cthulhu_calling = { path = "../cthulhu_calling/" }
 cthulhu = { path = "../cthulhu_macro/" }
 libc = "0.2.62"
+darling = "0.10.0"
 
 [dev-dependencies]
 trybuild = "1.0.11"

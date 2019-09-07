@@ -2,11 +2,47 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use std::{error::Error, fmt::Display, marker::PhantomData, sync::Arc};
 use syn::{
-    parse::{Parse, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
     FnArg, Pat, PatType, Type,
 };
+use std::convert::Infallible;
+
+#[macro_export]
+macro_rules! throw {
+    ($error:path, $ex:ident, $ty:path) => {{
+        use std::default::Default;
+
+        if let Some(callback) = $ex {
+            let err = format!("{:?}", $error);
+            let s = std::ffi::CString::new(err)
+                .unwrap_or_else(|_| std::ffi::CString::new("<unknown>".to_string()).unwrap());
+            callback(s.as_ptr());
+        }
+
+        <$ty>::default()
+    }};
+
+    ($error:path, $ex:ident) => {
+        throw!($error, $ex, ())
+    }
+}
+
+#[macro_export]
+macro_rules! try_not_null {
+    ($path:expr, $ex:ident, $ty:path) => {{
+        match $path {
+            Ok(v) => v,
+            Err(e) => {
+                return $crate::throw!(e, $ex, $ty);
+            }
+        }
+    }};
+
+    ($path:path, $ex:ident) => {
+        try_not_null!($path, $ex, ())
+    };
+}
 
 pub type ErrCallback = Option<extern "C" fn(*const libc::c_char)>;
 
@@ -22,7 +58,18 @@ pub trait FromForeign<Foreign, Local>: Sized {
     fn drop_local(_: Local) {}
 }
 
-struct BoxMarshaler<T>(PhantomData<T>);
+pub struct IntMarshaler<T: Copy>(PhantomData<T>);
+
+impl<T: Copy> FromForeign<T, T> for IntMarshaler<T> {
+    type Error = Infallible;
+
+    #[inline(always)]
+    fn from_foreign(n: T) -> Result<T, Self::Error> {
+        Ok(n)
+    }
+}
+
+pub struct BoxMarshaler<T>(PhantomData<T>);
 
 impl<T> FromForeign<*mut T, Box<T>> for BoxMarshaler<T> {
     type Error = Box<dyn Error>;
@@ -46,9 +93,9 @@ impl<T> ToForeign<Box<T>, *mut T> for BoxMarshaler<T> {
     }
 }
 
-struct ArcMarshaler<T>(PhantomData<T>);
+pub struct ArcMarshaler<T: ?Sized>(PhantomData<T>);
 
-impl<T> FromForeign<*const T, Arc<T>> for ArcMarshaler<T> {
+impl<T: ?Sized> FromForeign<*const T, Arc<T>> for ArcMarshaler<T> {
     type Error = Arc<dyn Error>;
 
     #[inline(always)]
@@ -61,7 +108,7 @@ impl<T> FromForeign<*const T, Arc<T>> for ArcMarshaler<T> {
     }
 }
 
-impl<T> ToForeign<Arc<T>, *const T> for ArcMarshaler<T> {
+impl<T: ?Sized> ToForeign<Arc<T>, *const T> for ArcMarshaler<T> {
     type Error = Arc<dyn Error>;
 
     #[inline(always)]
@@ -73,7 +120,7 @@ impl<T> ToForeign<Arc<T>, *const T> for ArcMarshaler<T> {
 pub struct BoolMarshaler;
 
 impl FromForeign<u8, bool> for BoolMarshaler {
-    type Error = std::convert::Infallible;
+    type Error = Infallible;
 
     #[inline(always)]
     fn from_foreign(i: u8) -> Result<bool, Self::Error> {
@@ -205,6 +252,7 @@ use darling::FromMeta;
 
 #[derive(Debug, FromMeta, Default)]
 pub struct InvokeParams {
+    #[darling(default)]
     pub return_marshaler: Option<syn::Path>
 }
 
@@ -246,15 +294,19 @@ pub fn call_with(
     let mut c_params: Punctuated<PatType, syn::Token![,]> = Punctuated::new();
     let mut c_args: Punctuated<Pat, syn::Token![,]> = Punctuated::new();
 
+    let mut needs_exception_param = false;
+
     for (i, param) in params.iter().enumerate() {
-        let (_out_type, marshaler) = &marshalers[i];
+        let (out_type, marshaler) = &marshalers[i];
         let name = to_c_arg(param).context("failed to convert Rust type to FFI type")?;
         let in_type = to_c_param(param).context("failed to convert Rust type to FFI type")?;
 
         if let Some(marshaler) = marshaler {
             let foreign = gen_foreign(&marshaler, &name, c_return_type_ty.as_ref());
             from_foreigns.extend(foreign);
-        } else {
+            needs_exception_param = true;
+        } else if !PASSTHROUGH_TYPES.with(|v| v.contains(&*out_type.ty)) {
+            println!("OUT TY: {:?}", &*out_type.ty);
             return Err(syn::Error::new_spanned(
                 &param,
                 "no marshaler found for type",
@@ -265,15 +317,24 @@ pub fn call_with(
         c_args.push(name);
     }
 
-    c_params.push(PatType {
-        attrs: vec![],
-        pat: Box::new(Pat::Verbatim(quote! { __exception })),
-        colon_token: <syn::Token![:]>::default(),
-        ty: Box::new(Type::Verbatim(quote! { ::cthulhu::ErrCallback })),
-    });
+
+    let passthrough_return = match return_type {
+        syn::ReturnType::Type(_, ty) => {
+            PASSTHROUGH_TYPES.with(|x| x.contains(&ty))
+        },
+        _ => true
+    };
+
+    if needs_exception_param || !passthrough_return {
+        c_params.push(PatType {
+            attrs: vec![],
+            pat: Box::new(Pat::Verbatim(quote! { __exception })),
+            colon_token: <syn::Token![:]>::default(),
+            ty: Box::new(Type::Verbatim(quote! { ::cthulhu::ErrCallback })),
+        });
+    }
 
     let rust_fn = &raw_function;
-    println!("RET: {:?}", &return_type);
     
     match return_type {
         syn::ReturnType::Default => {
@@ -286,13 +347,25 @@ pub fn call_with(
                 }
             })
         },
-        syn::ReturnType::Type(_, _) => {
+        syn::ReturnType::Type(_, ty) => {
+            if PASSTHROUGH_TYPES.with(|x| x.contains(&ty)) {
+                return Ok(quote! {
+                    #[no_mangle]
+                    extern "C" fn #name(#c_params) #c_return_type {
+                        #from_foreigns
+                        #rust_fn
+                        #name(#c_args)
+                    }
+                })
+            }
+
             let return_marshaler = invoke_params.return_marshaler.map(|x| Ok(x)).unwrap_or_else(|| {
                 DEFAULT_MARSHALERS.with(|map| {
-                    map.get(&return_type_ty.unwrap()).map(|x| x.clone()).ok_or_else(|| {
+                    map.get(&return_type_ty.clone().unwrap()).map(|x| x.clone()).ok_or_else(|| {
+                        println!("ret: {:?}", &return_type_ty);
                         syn::Error::new_spanned(
                             &return_type,
-                            "no marshaler found for type",
+                            "no marshaler found for return type",
                         )
                     })
                 })
@@ -342,7 +415,7 @@ fn gen_foreign(
 ) -> TokenStream {
     if let Some(ty) = ty {
         quote! {
-            let #name = ::cthulhu::try!(
+            let #name = ::cthulhu::try_not_null!(
                 #marshaler::from_foreign(#name),
                 __exception,
                 #ty
@@ -350,7 +423,7 @@ fn gen_foreign(
         }
     } else {
         quote! {
-            let #name = ::cthulhu::try!(
+            let #name = ::cthulhu::try_not_null!(
                 #marshaler::from_foreign(#name),
                 __exception
             );
@@ -363,6 +436,9 @@ fn to_c_type(ty: &Type) -> Result<Type, syn::Error> {
         // let PatType { ty, pat, .. } = arg.clone();
         match &*ty {
             syn::Type::Path(..) | syn::Type::Reference(..) => {}
+            syn::Type::Tuple(..) => {
+                return Err(syn::Error::new(ty.span(), "Tuple parameters not supported"))
+            }
             _ => return Err(syn::Error::new(ty.span(), "Unknown parameters not supported")),
         }
 
@@ -409,12 +485,30 @@ macro_rules! map_marshalers {
     }}
 }
 
+macro_rules! type_array {
+    [$($rust:ty,)*] => {{
+        vec![
+            $(syn::parse2(quote!{ $rust })
+                .expect(concat!("cannot parse", stringify!($rust), "as type")),
+            )*
+        ]
+    }}
+}
+
 thread_local! {
     pub static DEFAULT_MARSHALERS: std::collections::HashMap<Type, syn::Path> = map_marshalers![
         bool => ::cthulhu::BoolMarshaler,
         Cow<str> => ::cthulhu::StrMarshaler,
+        Arc<str> => ::cthulhu::ArcMarshaler::<str>,
         Arc<T> => ::cthulhu::ArcMarshaler<T>,
         Box<T> => ::cthulhu::BoxMarshaler<T>,
+    ];
+
+    pub static PASSTHROUGH_TYPES: Vec<Type> = type_array![
+        u8, i8,
+        u16, i16,
+        u32, i32,
+        i64, u64,
     ];
 
     pub static TYPE_MAPPING: std::collections::HashMap<Type, Vec<Type>> = map_types![

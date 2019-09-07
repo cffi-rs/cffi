@@ -2,8 +2,12 @@
 name = "cthulhu"
 description = "Macro for invoking cthulhu"
 version = "0.1.0"
-authors = ["Pascal Hertleif <pascal@technocreatives.com>"]
+authors = [
+  "Brendan Molloy <brendan@bbqsrc.net>",
+  "Pascal Hertleif <pascal@technocreatives.com>"
+]
 edition = "2018"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/killercup/cthulhu"
 readme = "README.md"
 
