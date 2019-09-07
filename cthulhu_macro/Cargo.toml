@@ -13,5 +13,6 @@ proc-macro = true
 [dependencies]
 syn = "1.0.5"
 quote = "1.0.2"
-proc-macro2 = "1.0.1"
+proc-macro2 = "1.0.3"
+darling = "0.10.0"
 cthulhu_calling = { path = "../cthulhu_calling" }

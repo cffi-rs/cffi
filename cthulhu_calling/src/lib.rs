@@ -8,6 +8,8 @@ use syn::{
     FnArg, Pat, PatType, Type,
 };
 
+pub type ErrCallback = Option<extern "C" fn(*const libc::c_char)>;
+
 pub trait ToForeign<Local, Foreign>: Sized {
     type Error;
     fn to_foreign(_: Local) -> Result<Foreign, Self::Error>;
@@ -68,7 +70,7 @@ impl<T> ToForeign<Arc<T>, *const T> for ArcMarshaler<T> {
     }
 }
 
-struct BoolMarshaler;
+pub struct BoolMarshaler;
 
 impl FromForeign<u8, bool> for BoolMarshaler {
     type Error = std::convert::Infallible;
@@ -84,7 +86,7 @@ use std::{
     ffi::{CStr, CString},
 };
 
-struct StrMarshaler<'a>(&'a PhantomData<()>);
+pub struct StrMarshaler<'a>(&'a PhantomData<()>);
 
 impl<'a> FromForeign<*const libc::c_char, Cow<'a, str>> for StrMarshaler<'a> {
     type Error = Box<dyn Error>;
@@ -193,20 +195,23 @@ fn collect_mappings_from_sig(
 fn process_function(
     mut func: syn::ItemFn,
 ) -> Result<(syn::ItemFn, Vec<(PatType, Option<syn::Path>)>), syn::Error> {
-    // Check function for "returns"
-    // TODO
-
     // Dig into inputs
     let marshal_attrs = collect_mappings_from_sig(&mut func.sig)?;
 
     Ok((func, marshal_attrs))
 }
 
+use darling::FromMeta;
+
+#[derive(Debug, FromMeta, Default)]
+pub struct InvokeParams {
+    pub return_marshaler: Option<syn::Path>
+}
+
 pub fn call_with(
-    params: TokenStream,
+    invoke_params: InvokeParams,
     raw_function: TokenStream,
 ) -> Result<TokenStream, syn::Error> {
-    let _params: Params = syn::parse2(params.clone()).context("error parsing params")?;
     let function: syn::Item =
         syn::parse2(raw_function.clone()).context("error parsing function body")?;
     let (fn_item, marshalers) = match function {
@@ -222,80 +227,153 @@ pub fn call_with(
     let syn::Signature { ident: ref name, inputs: ref params, output: ref return_type, .. } =
         fn_item.sig.clone();
 
+    let c_return_type = match return_type {
+        syn::ReturnType::Type(x, ty) => syn::ReturnType::Type(x.clone(), Box::new(to_c_type(&*ty)?)),
+        x => x.clone(),
+    };
+
+    let return_type_ty = match &return_type {
+        syn::ReturnType::Type(_, ty) => Some(*ty.clone()),
+        _ => None
+    };
+
+    let c_return_type_ty = match &c_return_type {
+        syn::ReturnType::Type(_, ty) => Some(*ty.clone()),
+        _ => None
+    };
+
     let mut from_foreigns = TokenStream::new();
     let mut c_params: Punctuated<PatType, syn::Token![,]> = Punctuated::new();
     let mut c_args: Punctuated<Pat, syn::Token![,]> = Punctuated::new();
 
     for (i, param) in params.iter().enumerate() {
-        let (out_type, marshaler) = &marshalers[i];
+        let (_out_type, marshaler) = &marshalers[i];
         let name = to_c_arg(param).context("failed to convert Rust type to FFI type")?;
         let in_type = to_c_param(param).context("failed to convert Rust type to FFI type")?;
 
         if let Some(marshaler) = marshaler {
-            let foreign = gen_foreign(&marshaler, &*in_type.ty, &*out_type.ty, &name);
+            let foreign = gen_foreign(&marshaler, &name, c_return_type_ty.as_ref());
             from_foreigns.extend(foreign);
+        } else {
+            return Err(syn::Error::new_spanned(
+                &param,
+                "no marshaler found for type",
+            ))
         }
 
         c_params.push(in_type);
         c_args.push(name);
     }
 
+    c_params.push(PatType {
+        attrs: vec![],
+        pat: Box::new(Pat::Verbatim(quote! { __exception })),
+        colon_token: <syn::Token![:]>::default(),
+        ty: Box::new(Type::Verbatim(quote! { ::cthulhu::ErrCallback })),
+    });
+
     let rust_fn = &raw_function;
+    println!("RET: {:?}", &return_type);
     
-    Ok(quote! {
-        #[no_mangle]
-        extern "C" fn #name(#c_params) #return_type {
-            #from_foreigns
+    match return_type {
+        syn::ReturnType::Default => {
+            Ok(quote! {
+                #[no_mangle]
+                extern "C" fn #name(#c_params) {
+                    #from_foreigns
+                    #rust_fn
+                    #name(#c_args);
+                }
+            })
+        },
+        syn::ReturnType::Type(_, _) => {
+            let return_marshaler = invoke_params.return_marshaler.map(|x| Ok(x)).unwrap_or_else(|| {
+                DEFAULT_MARSHALERS.with(|map| {
+                    map.get(&return_type_ty.unwrap()).map(|x| x.clone()).ok_or_else(|| {
+                        syn::Error::new_spanned(
+                            &return_type,
+                            "no marshaler found for type",
+                        )
+                    })
+                })
+            })?;
 
-            #rust_fn
+            let return_to_foreign = quote! {
+                match #return_marshaler::to_foreign(result) {
+                    Ok(v) => v,
+                    Err(e) => ::cthulhu::throw!(e, u8)
+                }
+            };
 
-            let result = #name(#c_args);
-            // #to_foreigns
+            Ok(quote! {
+                #[no_mangle]
+                extern "C" fn #name(#c_params) #c_return_type {
+                    #from_foreigns
+                    #rust_fn
+                    let result = #name(#c_args);
+                    #return_to_foreign
+                }
+            })
         }
-    })
+    }
+
+
+
 }
 
 fn to_c_param(arg: &FnArg) -> Result<PatType, syn::Error> {
     match arg {
-        FnArg::Typed(arg) => to_c_type(arg),
-        x => Err(syn::Error::new(arg.span(), "cannot")),
+        FnArg::Typed(arg) => Ok(PatType { ty: Box::new(to_c_type(&*arg.ty)?), ..arg.clone() }.into()),
+        _ => Err(syn::Error::new(arg.span(), "cannot")),
     }
 }
 
 fn to_c_arg(arg: &FnArg) -> Result<Pat, syn::Error> {
     match arg {
         FnArg::Typed(arg) => Ok(*arg.pat.clone()),
-        x => Err(syn::Error::new(arg.span(), "cannot")),
+        _ => Err(syn::Error::new(arg.span(), "cannot")),
     }
 }
 
 fn gen_foreign(
     marshaler: &syn::Path,
-    in_type: &syn::Type,
-    out_type: &syn::Type,
     name: &syn::Pat,
+    ty: Option<&syn::Type>
 ) -> TokenStream {
-    quote! {
-        let #name = #marshaler::<#in_type, #out_type>::from_foreign(#name);
+    if let Some(ty) = ty {
+        quote! {
+            let #name = ::cthulhu::try!(
+                #marshaler::from_foreign(#name),
+                __exception,
+                #ty
+            );
+        }
+    } else {
+        quote! {
+            let #name = ::cthulhu::try!(
+                #marshaler::from_foreign(#name),
+                __exception
+            );
+        }
     }
 }
 
-fn to_c_type(arg: &PatType) -> Result<PatType, syn::Error> {
+fn to_c_type(ty: &Type) -> Result<Type, syn::Error> {
     TYPE_MAPPING.with(|map| {
-        let PatType { ty, pat, .. } = arg.clone();
+        // let PatType { ty, pat, .. } = arg.clone();
         match &*ty {
             syn::Type::Path(..) | syn::Type::Reference(..) => {}
-            _ => return Err(syn::Error::new(pat.span(), "Unknown parameters not supported")),
+            _ => return Err(syn::Error::new(ty.span(), "Unknown parameters not supported")),
         }
 
         match map.get(&ty).cloned() {
             Some(types) => match types.as_slice() {
-                [c_ty] => Ok(PatType { ty: Box::new(c_ty.clone()), ..arg.clone() }.into()),
+                [c_ty] => Ok(c_ty.clone()),
                 _ => unreachable!(),
             },
             None => {
                 let c_ty: Type = syn::parse2(quote! { *const ::libc::c_void }).unwrap();
-                Ok(PatType { ty: Box::new(c_ty.clone()), ..arg.clone() }.into())
+                Ok(c_ty.clone())
             }
         }
     })
@@ -333,9 +411,10 @@ macro_rules! map_marshalers {
 
 thread_local! {
     pub static DEFAULT_MARSHALERS: std::collections::HashMap<Type, syn::Path> = map_marshalers![
-        bool => ::BoolMarshaler,
-        Arc<T> => ::ArcMarshaler,
-        Box<T> => ::BoxMarshaler,
+        bool => ::cthulhu::BoolMarshaler,
+        Cow<str> => ::cthulhu::StrMarshaler,
+        Arc<T> => ::cthulhu::ArcMarshaler<T>,
+        Box<T> => ::cthulhu::BoxMarshaler<T>,
     ];
 
     pub static TYPE_MAPPING: std::collections::HashMap<Type, Vec<Type>> = map_types![
@@ -351,16 +430,9 @@ thread_local! {
         &'a str => [*const ::libc::c_char],
         &'a CStr => [*const ::libc::c_char],
         CString => [*mut ::libc::c_char],
-        // Arc<str> => [*const ::libc::c_char, ::libc::size_t],
+        Arc<str> => [*const ::libc::c_char],
+        Cow<str> => [*const ::libc::c_char],
     ];
-}
-
-pub struct Params {}
-
-impl Parse for Params {
-    fn parse(_input: ParseStream) -> Result<Self, syn::Error> {
-        Ok(Params {})
-    }
 }
 
 trait ErrorExt<T> {
@@ -373,5 +445,14 @@ impl<T> ErrorExt<T> for Result<T, syn::Error> {
             Err(err) => Err(syn::Error::new(err.span(), format!("{}: {}", msg, err.to_string()))),
             x => x,
         }
+    }
+}
+
+#[no_mangle]
+pub extern fn derp_callback(callback: Option<extern "C" fn(*const libc::c_char)>) {
+    let cstr = CString::new("This is a string!").unwrap();
+    
+    if let Some(callback) = callback {
+        callback(cstr.as_ptr());
     }
 }
