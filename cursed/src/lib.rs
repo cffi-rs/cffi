@@ -1,6 +1,12 @@
-use std::error::Error;
-use std::marker::PhantomData;
-use std::sync::Arc;
+use std::{
+    error::Error,
+    marker::PhantomData,
+    sync::Arc,
+    borrow::Cow,
+    ffi::{CStr, CString},
+    convert::Infallible,
+    io
+};
 
 #[macro_export]
 macro_rules! throw {
@@ -38,8 +44,6 @@ macro_rules! try_not_null {
     };
 }
 
-use std::convert::Infallible;
-
 pub type ErrCallback = Option<extern "C" fn(*const libc::c_char)>;
 
 pub trait ToForeign<Local, Foreign>: Sized {
@@ -54,22 +58,42 @@ pub trait FromForeign<Foreign, Local>: Sized {
     fn drop_local(_: Local) {}
 }
 
-pub struct BoxMarshaler<T>(PhantomData<T>);
+#[inline(always)]
+fn null_ptr_error() -> Box<io::Error> {
+    Box::new(io::Error::new(io::ErrorKind::InvalidData, "null pointer"))
+}
 
-impl<T> FromForeign<*mut T, Box<T>> for BoxMarshaler<T> {
+/// Magical catch-all implementation for `Result<Local, Error>`.
+impl<T, Foreign, Local, Error> ToForeign<Result<Local, Error>, Foreign> for T
+where
+    T: ToForeign<Local, Foreign, Error = Error>
+{
+    type Error = Error;
+
+    fn to_foreign(result: Result<Local, Error>) -> Result<Foreign, Self::Error> {
+        match result {
+            Ok(v) => <Self as ToForeign<Local, Foreign>>::to_foreign(v),
+            Err(e) => Err(e)
+        }
+    }
+}
+
+pub struct BoxMarshaler<T: ?Sized>(PhantomData<T>);
+
+impl<T: ?Sized> FromForeign<*mut T, Box<T>> for BoxMarshaler<T> {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
     fn from_foreign(box_ptr: *mut T) -> Result<Box<T>, Self::Error> {
         if box_ptr.is_null() {
-            // TODO: error
+            return Err(null_ptr_error());
         }
 
         Ok(unsafe { Box::from_raw(box_ptr) })
     }
 }
 
-impl<T> ToForeign<Box<T>, *mut T> for BoxMarshaler<T> {
+impl<T: ?Sized> ToForeign<Box<T>, *mut T> for BoxMarshaler<T> {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
@@ -81,12 +105,12 @@ impl<T> ToForeign<Box<T>, *mut T> for BoxMarshaler<T> {
 pub struct ArcMarshaler<T: ?Sized>(PhantomData<T>);
 
 impl<T: ?Sized> FromForeign<*const T, Arc<T>> for ArcMarshaler<T> {
-    type Error = Arc<dyn Error>;
+    type Error = Box<dyn Error>;
 
     #[inline(always)]
     fn from_foreign(arc_ptr: *const T) -> Result<Arc<T>, Self::Error> {
         if arc_ptr.is_null() {
-            // TODO: error
+            return Err(null_ptr_error());
         }
 
         Ok(unsafe { Arc::from_raw(arc_ptr) })
@@ -113,10 +137,14 @@ impl FromForeign<u8, bool> for BoolMarshaler {
     }
 }
 
-use std::{
-    borrow::Cow,
-    ffi::{CStr, CString},
-};
+impl ToForeign<bool, u8> for BoolMarshaler {
+    type Error = std::convert::Infallible;
+
+    #[inline(always)]
+    fn to_foreign(b: bool) -> Result<u8, Self::Error> {
+        Ok(if b { 1 } else { 0 })
+    }
+}
 
 pub struct StrMarshaler<'a>(&'a PhantomData<()>);
 
@@ -125,7 +153,7 @@ impl<'a> FromForeign<*const libc::c_char, Cow<'a, str>> for StrMarshaler<'a> {
 
     fn from_foreign(key: *const libc::c_char) -> Result<Cow<'a, str>, Self::Error> {
         if key.is_null() {
-            return Err(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, "null pointer")));
+            return Err(null_ptr_error());
         }
         Ok(unsafe { CStr::from_ptr(key) }.to_string_lossy())
     }
@@ -140,15 +168,8 @@ impl<'a> ToForeign<&'a str, *const libc::c_char> for StrMarshaler<'a> {
     }
 
     fn drop_foreign(ptr: *const libc::c_char) {
-        unsafe { CString::from_raw(ptr as *mut _) };
-    }
-}
-
-impl ToForeign<bool, u8> for BoolMarshaler {
-    type Error = std::convert::Infallible;
-
-    #[inline(always)]
-    fn to_foreign(b: bool) -> Result<u8, Self::Error> {
-        Ok(if b { 1 } else { 0 })
+        if !ptr.is_null() {
+            unsafe { CString::from_raw(ptr as *mut _) };
+        }
     }
 }
