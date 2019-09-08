@@ -1,6 +1,6 @@
+use assert_tokens_eq::assert_tokens_eq;
 use cthulhu_macro::{call_with, InvokeParams};
 use quote::quote;
-use assert_tokens_eq::assert_tokens_eq;
 
 #[test]
 fn test_bool() {
@@ -131,16 +131,15 @@ fn custom_json() {
 fn return_marshaler() {
     let res = call_with(
         InvokeParams {
-            return_marshaler: Some(
-                syn::parse2(quote! { ::cursed::BoolMarshaler }).unwrap()
-            )
+            return_marshaler: Some(syn::parse2(quote! { ::cursed::BoolMarshaler }).unwrap()),
         },
         quote! {
             fn foo(input: Cow<str>, input2: Cow<str>) -> bool {
                 input == input2
             }
         },
-    ).unwrap();
+    )
+    .unwrap();
 
     let expected = quote! {
         #[no_mangle]
@@ -168,6 +167,27 @@ fn return_marshaler() {
                 Err(e) => ::cursed::throw!(e, u8)
             }
         }
+    };
+
+    assert_tokens_eq!(res, expected);
+}
+
+#[test]
+fn fuu() {
+    let res = call_with(
+        InvokeParams {
+            return_marshaler: Some(syn::parse2(quote! { BoxFileResultMarshaler }).unwrap()),
+        },
+        quote! {
+            pub fn box_file_open(path: Cow<str>) -> std::io::Result<BoxFile> {
+                BoxFile::open(&*path)
+            }
+        },
+    )
+    .unwrap();
+
+    let expected = quote! {
+        #[no_mangle]
     };
 
     assert_tokens_eq!(res, expected);

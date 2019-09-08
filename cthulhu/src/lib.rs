@@ -1,6 +1,6 @@
 extern crate proc_macro;
-use proc_macro::TokenStream;
 use darling::FromMeta;
+use proc_macro::TokenStream;
 use syn::AttributeArgs;
 
 #[proc_macro_attribute]
@@ -9,7 +9,7 @@ pub fn invoke(params: TokenStream, function: TokenStream) -> TokenStream {
 
     let params = match cthulhu_macro::InvokeParams::from_list(&params) {
         Ok(v) => v,
-        Err(err) => return err.write_errors().into()
+        Err(err) => return err.write_errors().into(),
     };
 
     match cthulhu_macro::call_with(params, function.into()) {

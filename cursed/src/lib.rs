@@ -1,10 +1,10 @@
-use std::sync::Arc;
 use std::error::Error;
 use std::marker::PhantomData;
+use std::sync::Arc;
 
 #[macro_export]
 macro_rules! throw {
-    ($error:path, $ex:ident, $ty:path) => {{
+    ($error:path, $ex:ident, $fallback:expr) => {{
         use std::default::Default;
 
         if let Some(callback) = $ex {
@@ -14,21 +14,21 @@ macro_rules! throw {
             callback(s.as_ptr());
         }
 
-        <$ty>::default()
+        $fallback
     }};
 
     ($error:path, $ex:ident) => {
-        throw!($error, $ex, ())
-    }
+        $crate::throw!($error, $ex, ())
+    };
 }
 
 #[macro_export]
 macro_rules! try_not_null {
-    ($path:expr, $ex:ident, $ty:path) => {{
+    ($path:expr, $ex:ident, $fallback:expr) => {{
         match $path {
             Ok(v) => v,
             Err(e) => {
-                return $crate::throw!(e, $ex, $ty);
+                return $crate::throw!(e, $ex, $fallback);
             }
         }
     }};

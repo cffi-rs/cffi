@@ -3,4 +3,5 @@ members = [
   "cursed",
   "cthulhu",
   "cthulhu_tests",
+  "cthulhu_macro"
 ]

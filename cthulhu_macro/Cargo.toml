@@ -20,6 +20,14 @@ quote = "1.0.2"
 proc-macro2 = "1.0.3"
 libc = "0.2.62"
 darling = "0.10.0"
+phf = "0.7.24"
 
 [dev-dependencies]
 assert_tokens_eq = { git = "https://github.com/killercup/assert_tokens_eq" }
+
+[build-dependencies]
+phf_codegen = "0.7.24"
+syn = { version = "1.0.5", features = ["full", "extra-traits"] }
+quote = "1.0.2"
+proc-macro2 = "1.0.3"
+
