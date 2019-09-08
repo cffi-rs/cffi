@@ -124,6 +124,9 @@ impl<'a> FromForeign<*const libc::c_char, Cow<'a, str>> for StrMarshaler<'a> {
     type Error = Box<dyn Error>;
 
     fn from_foreign(key: *const libc::c_char) -> Result<Cow<'a, str>, Self::Error> {
+        if key.is_null() {
+            return Err(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, "null pointer")));
+        }
         Ok(unsafe { CStr::from_ptr(key) }.to_string_lossy())
     }
 }
