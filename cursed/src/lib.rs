@@ -49,72 +49,77 @@ pub type ErrCallback = Option<extern "C" fn(*const libc::c_char)>;
 pub trait ToForeign<Local, Foreign>: Sized {
     type Error;
     fn to_foreign(_: Local) -> Result<Foreign, Self::Error>;
-    fn drop_foreign(_: Foreign) {}
+}
+
+pub trait ToForeignResult<Local, Foreign>: Sized {
+    type Error;
+    fn to_foreign(result: Result<Local, Self::Error>) -> Result<Foreign, Self::Error>;
 }
 
 pub trait FromForeign<Foreign, Local>: Sized {
     type Error;
     fn from_foreign(_: Foreign) -> Result<Local, Self::Error>;
-    fn drop_local(_: Local) {}
+}
+
+pub struct BoxMarshaler<T: ?Sized>(PhantomData<T>);
+
+impl<T> ToForeign<T, *const T> for BoxMarshaler<T> {
+    type Error = Infallible;
+    fn to_foreign(local: T) -> Result<*const T, Self::Error> {
+        Ok(Box::into_raw(Box::new(local)))
+    }
+}
+
+impl<T> ToForeign<T, *mut T> for BoxMarshaler<T> {
+    type Error = Infallible;
+    fn to_foreign(local: T) -> Result<*mut T, Self::Error> {
+        Ok(Box::into_raw(Box::new(local)))
+    }
+}
+
+impl<T: ?Sized> ToForeign<Box<T>, *mut T> for BoxMarshaler<T> {
+    type Error = Infallible;
+    fn to_foreign(local: Box<T>) -> Result<*mut T, Self::Error> {
+        Ok(Box::into_raw(local))
+    }
+}
+
+impl<'a, T: ?Sized> FromForeign<*mut T, &'a mut T> for BoxMarshaler<T> {
+    type Error = Box<dyn Error>;
+    fn from_foreign(foreign: *mut T) -> Result<&'a mut T, Self::Error> {
+        if foreign.is_null() {
+            return Err(null_ptr_error());
+        }
+
+        Ok(unsafe { &mut *foreign })
+    }
+}
+
+impl<'a, T: ?Sized> FromForeign<*const T, &'a T> for BoxMarshaler<T> {
+    type Error = Box<dyn Error>;
+    fn from_foreign(foreign: *const T) -> Result<&'a T, Self::Error> {
+        if foreign.is_null() {
+            return Err(null_ptr_error());
+        }
+
+        Ok(unsafe { &*foreign as &'a T })
+    }
+}
+
+impl<'a, T: ?Sized> FromForeign<*mut T, Box<T>> for BoxMarshaler<T> {
+    type Error = Box<dyn Error>;
+    fn from_foreign(foreign: *mut T) -> Result<Box<T>, Self::Error> {
+        if foreign.is_null() {
+            return Err(null_ptr_error());
+        }
+
+        Ok(unsafe { Box::from_raw(foreign) })
+    }
 }
 
 #[inline(always)]
 fn null_ptr_error() -> Box<io::Error> {
     Box::new(io::Error::new(io::ErrorKind::InvalidData, "null pointer"))
-}
-
-/// Magical catch-all implementation for `Result<Local, Error>`.
-impl<T, Foreign, Local, Error> ToForeign<Result<Local, Error>, Foreign> for T
-where
-    T: ToForeign<Local, Foreign, Error = Error>,
-{
-    type Error = Error;
-
-    fn to_foreign(result: Result<Local, Error>) -> Result<Foreign, Self::Error> {
-        match result {
-            Ok(v) => <Self as ToForeign<Local, Foreign>>::to_foreign(v),
-            Err(e) => Err(e),
-        }
-    }
-}
-
-/// Magical catch-all implementation for `Option<Local>`.
-impl<T, Foreign, Local> ToForeign<Option<Local>, Option<Foreign>> for T
-where
-    T: ToForeign<Local, Foreign>,
-{
-    type Error = T::Error;
-
-    fn to_foreign(option: Option<Local>) -> Result<Option<Foreign>, Self::Error> {
-        match option {
-            Some(v) => <Self as ToForeign<Local, Foreign>>::to_foreign(v).map(|v| Some(v)),
-            None => Ok(None),
-        }
-    }
-}
-
-pub struct BoxMarshaler<T: ?Sized>(PhantomData<T>);
-
-impl<T: ?Sized> FromForeign<*mut T, Box<T>> for BoxMarshaler<T> {
-    type Error = Box<dyn Error>;
-
-    #[inline(always)]
-    fn from_foreign(box_ptr: *mut T) -> Result<Box<T>, Self::Error> {
-        if box_ptr.is_null() {
-            return Err(null_ptr_error());
-        }
-
-        Ok(unsafe { Box::from_raw(box_ptr) })
-    }
-}
-
-impl<T: ?Sized> ToForeign<Box<T>, *mut T> for BoxMarshaler<T> {
-    type Error = Box<dyn Error>;
-
-    #[inline(always)]
-    fn to_foreign(boxed: Box<T>) -> Result<*mut T, Self::Error> {
-        Ok(Box::into_raw(boxed))
-    }
 }
 
 pub struct ArcMarshaler<T: ?Sized>(PhantomData<T>);
@@ -163,28 +168,89 @@ impl ToForeign<bool, u8> for BoolMarshaler {
 
 pub struct StrMarshaler<'a>(&'a PhantomData<()>);
 
-impl<'a> FromForeign<*const libc::c_char, Cow<'a, str>> for StrMarshaler<'a> {
+impl ToForeign<String, *const libc::c_char> for StrMarshaler<'_> {
     type Error = Box<dyn Error>;
 
-    fn from_foreign(key: *const libc::c_char) -> Result<Cow<'a, str>, Self::Error> {
-        if key.is_null() {
-            return Err(null_ptr_error());
-        }
-        Ok(unsafe { CStr::from_ptr(key) }.to_string_lossy())
+    #[inline(always)]
+    fn to_foreign(string: String) -> Result<*const libc::c_char, Self::Error> {
+        let c_str = std::ffi::CString::new(string)?;
+        Ok(CString::into_raw(c_str))
     }
 }
 
 impl<'a> ToForeign<&'a str, *const libc::c_char> for StrMarshaler<'a> {
     type Error = Box<dyn Error>;
 
+    #[inline(always)]
     fn to_foreign(input: &'a str) -> Result<*const libc::c_char, Self::Error> {
         let c_str = CString::new(input)?;
         Ok(c_str.into_raw())
     }
+}
 
-    fn drop_foreign(ptr: *const libc::c_char) {
-        if !ptr.is_null() {
-            unsafe { CString::from_raw(ptr as *mut _) };
+impl<'a> FromForeign<*const libc::c_char, &'a str> for StrMarshaler<'a> {
+    type Error = Box<dyn Error>;
+
+    #[inline(always)]
+    fn from_foreign(key: *const libc::c_char) -> Result<&'a str, Self::Error> {
+        if key.is_null() {
+            return Err(null_ptr_error());
+        }
+
+        Ok(unsafe { CStr::from_ptr(key) }.to_str()?)
+    }
+}
+
+impl<'a> FromForeign<*const libc::c_char, Cow<'a, str>> for StrMarshaler<'a> {
+    type Error = Box<dyn Error>;
+
+    #[inline(always)]
+    fn from_foreign(key: *const libc::c_char) -> Result<Cow<'a, str>, Self::Error> {
+        if key.is_null() {
+            return Err(null_ptr_error());
+        }
+
+        Ok(unsafe { CStr::from_ptr(key) }.to_string_lossy())
+    }
+}
+
+impl<'a> FromForeign<*mut libc::c_char, CString> for StrMarshaler<'a> {
+    type Error = Box<dyn Error>;
+
+    #[inline(always)]
+    fn from_foreign(key: *mut libc::c_char) -> Result<CString, Self::Error> {
+        if key.is_null() {
+            return Err(null_ptr_error());
+        }
+
+        Ok(unsafe { CString::from_raw(key) })
+    }
+}
+
+impl<'a> FromForeign<*mut libc::c_char, String> for StrMarshaler<'a> {
+    type Error = Box<dyn Error>;
+
+    #[inline(always)]
+    fn from_foreign(key: *mut libc::c_char) -> Result<String, Self::Error> {
+        if key.is_null() {
+            return Err(null_ptr_error());
+        }
+
+        Ok(unsafe { CString::from_raw(key) }.into_string()?)
+    }
+}
+
+/// Magical catch-all implementation for `Result<Local, Error>`.
+impl<T, Foreign, Local> ToForeignResult<Local, Foreign> for T
+where
+    T: ToForeign<Local, Foreign>,
+{
+    type Error = T::Error;
+
+    fn to_foreign(result: Result<Local, T::Error>) -> Result<Foreign, Self::Error> {
+        match result {
+            Ok(v) => <Self as ToForeign<Local, Foreign>>::to_foreign(v),
+            Err(e) => Err(e),
         }
     }
 }
