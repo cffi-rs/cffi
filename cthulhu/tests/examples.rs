@@ -132,6 +132,7 @@ fn return_marshaler() {
     let res = call_with(
         InvokeParams {
             return_marshaler: Some(syn::parse2(quote! { ::cursed::BoolMarshaler }).unwrap()),
+            prefix: None,
         },
         quote! {
             fn foo(input: Cow<str>, input2: Cow<str>) -> bool {
@@ -177,6 +178,7 @@ fn fuu() {
     let res = call_with(
         InvokeParams {
             return_marshaler: Some(syn::parse2(quote! { BoxFileResultMarshaler }).unwrap()),
+            prefix: None,
         },
         quote! {
             pub fn box_file_open(path: Cow<str>) -> std::io::Result<BoxFile> {
@@ -190,5 +192,107 @@ fn fuu() {
         #[no_mangle]
     };
 
+    assert_tokens_eq!(res, expected);
+}
+
+#[test]
+fn impl_life() {
+    let res = call_with(
+        InvokeParams { return_marshaler: None, prefix: Some("ex_pref_".to_string()) },
+        quote! {
+            impl Something {
+                pub fn new(item: &str) -> Something {
+                    Something { item }
+                }
+
+                fn some_internal_function(foo: u8) {
+
+                }
+
+                pub fn act_upon_ref(&self) {
+
+                }
+
+                pub fn act_upon_consume(self) {
+
+                }
+
+                pub fn act_upon_mut_ref(&mut self) {
+
+                }
+
+                pub fn do_something_static() {
+
+                }
+            }
+        },
+    )
+    .unwrap();
+
+    let expected = quote! {
+        #[no_mangle]
+        pub extern "C" fn ex_pref_something_free(
+            __handle: *mut ::libc::c_void,
+            __exception: ::cursed::ErrCallback,
+        ) {
+            ::cursed::try_not_null!(
+                ::cursed::BoxMarshaler::from_foreign_as_owned(__handle),
+                __exception,
+            );
+            log::debug!("ex_pref_something_free has consumed this handle; do not reuse it!");
+            unsafe { *__handle = std::ptr::null_mut(); }
+        }
+
+        #[no_mangle]
+        pub extern "C" fn ex_pref_something_new(
+            item: *const ::libc::c_str,
+            __exception: ::cursed::ErrCallback
+        ) -> *mut ::libc::c_void {
+            let item = ::cursed::try_not_null!(
+                ::cursed::StrMarshaler::from_foreign(item),
+                __exception,
+                std::ptr::null_mut(),
+            );
+            let result = Something::new(item);
+            match ::cursed::BoxMarshaler::to_foreign(result) {
+                Ok(v) => v,
+                Err(e) => ::cursed::throw!(e, __exception, std::ptr::null_mut())
+            }
+        }
+
+        #[no_mangle]
+        pub extern "C" fn ex_pref_something_act_upon_ref(__handle: *const c_void, __exception: ::cursed::ErrCallback) {
+            let __handle = ::cursed::try_not_null!(
+                ::cursed::BoxMarshaler::from_foreign_as_ref(__handle),
+                __exception,
+            );
+            Something::act_upon_ref(__handle);
+        }
+
+        #[no_mangle]
+        pub extern "C" fn ex_pref_something_act_upon_consume(__handle: *mut c_void, __exception: ::cursed::ErrCallback) {
+            let __handle = ::cursed::try_not_null!(
+                ::cursed::BoxMarshaler::from_foreign_as_owned(__handle),
+                __exception,
+            );
+            Something::act_upon_consume(__handle);
+            log::debug!("act_upon has consumed this handle; do not reuse it!");
+            unsafe { *__handle = std::ptr::null_mut(); }
+        }
+
+        #[no_mangle]
+        pub extern "C" fn ex_pref_something_act_upon_mut_ref(__handle: *mut c_void, __exception: ::cursed::ErrCallback) {
+            let __handle = ::cursed::try_not_null!(
+                ::cursed::BoxMarshaler::from_foreign_as_ref_mut(__handle),
+                __exception,
+            );
+            Something::act_upon_ref(__handle);
+        }
+
+        #[no_mangle]
+        pub extern "C" fn ex_pref_something_do_something_static() {
+            Something::do_something_static();
+        }
+    };
     assert_tokens_eq!(res, expected);
 }

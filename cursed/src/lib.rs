@@ -1,11 +1,11 @@
 use std::{
+    borrow::Cow,
+    convert::Infallible,
     error::Error,
+    ffi::{CStr, CString},
+    io,
     marker::PhantomData,
     sync::Arc,
-    borrow::Cow,
-    ffi::{CStr, CString},
-    convert::Infallible,
-    io
 };
 
 #[macro_export]
@@ -66,14 +66,29 @@ fn null_ptr_error() -> Box<io::Error> {
 /// Magical catch-all implementation for `Result<Local, Error>`.
 impl<T, Foreign, Local, Error> ToForeign<Result<Local, Error>, Foreign> for T
 where
-    T: ToForeign<Local, Foreign, Error = Error>
+    T: ToForeign<Local, Foreign, Error = Error>,
 {
     type Error = Error;
 
     fn to_foreign(result: Result<Local, Error>) -> Result<Foreign, Self::Error> {
         match result {
             Ok(v) => <Self as ToForeign<Local, Foreign>>::to_foreign(v),
-            Err(e) => Err(e)
+            Err(e) => Err(e),
+        }
+    }
+}
+
+/// Magical catch-all implementation for `Option<Local>`.
+impl<T, Foreign, Local> ToForeign<Option<Local>, Option<Foreign>> for T
+where
+    T: ToForeign<Local, Foreign>,
+{
+    type Error = T::Error;
+
+    fn to_foreign(option: Option<Local>) -> Result<Option<Foreign>, Self::Error> {
+        match option {
+            Some(v) => <Self as ToForeign<Local, Foreign>>::to_foreign(v).map(|v| Some(v)),
+            None => Ok(None),
         }
     }
 }

@@ -14,12 +14,16 @@ fn collect_mappings_from_sig(
     let attrs = sig
         .inputs
         .iter_mut()
-        .filter_map(|x| match x {
-            syn::FnArg::Typed(t) => Some(t),
-            _ => None,
+        .filter_map(|x| {
+            println!("XXX: {:#?}", &x);
+            match x {
+                syn::FnArg::Typed(t) => Some(t),
+                _ => None,
+            }
         })
         .map(|input| {
             let mut unhandled_attrs = vec![];
+            println!("IN: {:?}", &input);
 
             std::mem::swap(&mut input.attrs, &mut unhandled_attrs);
 
@@ -67,6 +71,7 @@ fn collect_mappings_from_sig(
                 // TODO: have a very strong, negative opinion.
             }
 
+            println!("{:?} {:?}", &input, &idents);
             (input.to_owned(), idents.pop())
         })
         .map(|x| {
@@ -91,6 +96,8 @@ fn process_function(
 pub struct InvokeParams {
     #[darling(default)]
     pub return_marshaler: Option<syn::Path>,
+    #[darling(default)]
+    pub prefix: Option<String>,
 }
 
 enum ReturnPtrTy {
@@ -115,19 +122,97 @@ impl ReturnPtrTy {
 
 pub fn call_with(
     invoke_params: InvokeParams,
-    raw_function: TokenStream,
+    item: TokenStream,
 ) -> Result<TokenStream, syn::Error> {
-    let function: syn::Item =
-        syn::parse2(raw_function.clone()).context("error parsing function body")?;
-    let (fn_item, marshalers) = match function {
-        syn::Item::Fn(f) => process_function(f)?,
-        _ => {
-            return Err(syn::Error::new_spanned(
-                &raw_function,
-                "only supported on functions right now",
-            ))
+    let item: syn::Item = syn::parse2(item.clone()).context("error parsing function body")?;
+    match item {
+        syn::Item::Fn(item) => call_with_function(invoke_params, item),
+        syn::Item::Impl(item) => call_with_impl(invoke_params, item),
+        _ => Err(syn::Error::new_spanned(&item, "Only supported on functions and impls")),
+    }
+}
+
+fn call_with_impl(
+    invoke_params: InvokeParams,
+    item: syn::ItemImpl,
+) -> Result<TokenStream, syn::Error> {
+    if let Some(defaultness) = item.defaultness {
+        return Err(syn::Error::new_spanned(&defaultness, "Does not support specialised impls"));
+    }
+
+    if let Some(unsafety) = item.unsafety {
+        return Err(syn::Error::new_spanned(&unsafety, "Does not support unsafe impls"));
+    }
+
+    if !item.generics.params.is_empty() {
+        return Err(syn::Error::new_spanned(&item.generics, "Does not support generic impls"));
+    }
+
+    if let Some(trait_) = item.trait_ {
+        return Err(syn::Error::new_spanned(&trait_.1, "Does not support trait impls"));
+    }
+
+    use heck::SnakeCase;
+
+    let self_ty = item.self_ty;
+    let invoke_prefix = invoke_params.prefix.unwrap_or_else(|| "".into());
+    let prefix = format!("{}_{}", invoke_prefix, quote! { #self_ty }).to_snake_case();
+    let pub_methods = item.items.iter().filter_map(|impl_item| match impl_item {
+        syn::ImplItem::Method(method) => match (
+            &method.vis,
+            method.sig.asyncness,
+            method.sig.unsafety,
+            &method.sig.abi,
+            &method.sig.generics.params.is_empty(),
+        ) {
+            (syn::Visibility::Public(_), None, None, None, true) => Some(method),
+            _ => None,
+        },
+        _ => None,
+    });
+
+    let pub_method_names = pub_methods
+        .map(|x| {
+            let ident = &x.sig.ident;
+            let c_ident: syn::Ident = syn::parse_str(&format!("{}_{}", prefix, &ident).to_snake_case()).unwrap();
+
+            quote! {
+                #[no_mangle]
+                pub extern "C" fn #c_ident() {
+                    #self_ty::#ident();
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let free_ident: syn::Ident = syn::parse_str(&format!("{}_free", prefix).to_snake_case()).unwrap();
+
+    println!("{:?}, {:?}", prefix, pub_method_names);
+    Ok(quote! {
+        #[no_mangle]
+        pub extern "C" fn #free_ident(
+            __handle: *mut ::libc::c_void,
+            __exception: ::cursed::ErrCallback,
+        ) {
+            ::cursed::try_not_null!(
+                ::cursed::BoxMarshaler::from_foreign_as_owned(__handle),
+                __exception,
+            );
+            log::debug!("ex_pref_something_free has consumed this handle; do not reuse it!");
+            unsafe {
+                *__handle = std::ptr::null_mut();
+            }
         }
-    };
+
+        #(#pub_method_names)*
+    })
+}
+
+fn call_with_function(
+    invoke_params: InvokeParams,
+    item: syn::ItemFn,
+) -> Result<TokenStream, syn::Error> {
+    let (fn_item, marshalers) = process_function(item.clone())?;
 
     let syn::Signature { ident: ref name, inputs: ref params, output: ref return_type, .. } =
         fn_item.sig.clone();
@@ -189,7 +274,7 @@ pub fn call_with(
         });
     }
 
-    let rust_fn = &raw_function;
+    let rust_fn = &item;
 
     match return_type {
         syn::ReturnType::Default => Ok(quote! {
@@ -227,8 +312,12 @@ pub fn call_with(
 
             let err = match c_return_is_ptr {
                 None => quote! { ::cursed::throw!(e, __exception, <#c_return_type_ty>::default()) },
-                Some(ReturnPtrTy::Const) => quote! { ::cursed::throw!(e, __exception, std::ptr::null()) },
-                Some(ReturnPtrTy::Mut) => quote! { ::cursed::throw!(e, __exception, std::ptr::null_mut()) },
+                Some(ReturnPtrTy::Const) => {
+                    quote! { ::cursed::throw!(e, __exception, std::ptr::null()) }
+                }
+                Some(ReturnPtrTy::Mut) => {
+                    quote! { ::cursed::throw!(e, __exception, std::ptr::null_mut()) }
+                }
             };
 
             let return_to_foreign = quote! {

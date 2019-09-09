@@ -21,6 +21,7 @@ proc-macro2 = "1.0.3"
 libc = "0.2.62"
 darling = "0.10.0"
 phf = "0.7.24"
+heck = "0.3"
 
 [dev-dependencies]
 assert_tokens_eq = { git = "https://github.com/killercup/assert_tokens_eq" }
