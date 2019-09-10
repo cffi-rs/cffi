@@ -51,11 +51,6 @@ pub trait ToForeign<Local, Foreign>: Sized {
     fn to_foreign(_: Local) -> Result<Foreign, Self::Error>;
 }
 
-pub trait ToForeignResult<Local, Foreign>: Sized {
-    type Error;
-    fn to_foreign(result: Result<Local, Self::Error>) -> Result<Foreign, Self::Error>;
-}
-
 pub trait FromForeign<Foreign, Local>: Sized {
     type Error;
     fn from_foreign(_: Foreign) -> Result<Local, Self::Error>;
@@ -84,6 +79,8 @@ pub trait FromForeign<Foreign, Local>: Sized {
 /// ## Example
 /// 
 /// ```rust
+/// use cursed::{BoxMarshaler, FromForeign, ToForeign};
+/// 
 /// struct Something {
 ///     data: Vec<u8>
 /// }
@@ -97,9 +94,9 @@ pub trait FromForeign<Foreign, Local>: Sized {
 ///     /* send `ptr` over ffi, process it in some way, etc */
 /// 
 ///     // This isn't infallible though, checks for null pointers.
-///     let boxed: Box<Something> = BoxMarshaler::from_foreign(ptr) {
+///     let boxed: Box<Something> = match BoxMarshaler::from_foreign(ptr) {
 ///         Ok(v) => v,
-///         Err(e) => panic!(e)
+///         Err(e) => panic!("!")
 ///     };
 /// 
 ///     // Let the boxed item drop and it is freed. :)
@@ -107,41 +104,41 @@ pub trait FromForeign<Foreign, Local>: Sized {
 /// ```
 pub struct BoxMarshaler<T: ?Sized>(PhantomData<T>);
 
-impl<T> ToForeign<T, *const T> for BoxMarshaler<T> {
-    type Error = Infallible;
+// impl<T> ToForeign<T, *const libc::c_void> for BoxMarshaler<T> {
+//     type Error = Infallible;
     
-    #[inline(always)]
-    fn to_foreign(local: T) -> Result<*const T, Self::Error> {
-        Ok(Box::into_raw(Box::new(local)))
-    }
-}
+//     #[inline(always)]
+//     fn to_foreign(local: T) -> Result<*const libc::c_void, Self::Error> {
+//         Ok(Box::into_raw(Box::new(local)) as *const _ as *const _)
+//     }
+// }
 
-impl<T> ToForeign<T, *mut T> for BoxMarshaler<T> {
-    type Error = Infallible;
+// impl<T> ToForeign<T, *mut libc::c_void> for BoxMarshaler<T> {
+//     type Error = Infallible;
     
-    #[inline(always)]
-    fn to_foreign(local: T) -> Result<*mut T, Self::Error> {
-        Ok(Box::into_raw(Box::new(local)))
-    }
-}
+//     #[inline(always)]
+//     fn to_foreign(local: T) -> Result<*mut libc::c_void, Self::Error> {
+//         Ok(Box::into_raw(Box::new(local)) as *mut _ as *mut _)
+//     }
+// }
 
-impl<'a, T: Clone> ToForeign<&'a T, *const T> for BoxMarshaler<T> {
-    type Error = Infallible;
+// impl<'a, T: Clone> ToForeign<&'a T, *const T> for BoxMarshaler<T> {
+//     type Error = Infallible;
     
-    #[inline(always)]
-    fn to_foreign(local: &'a T) -> Result<*const T, Self::Error> {
-        Ok(Box::into_raw(Box::new(local.clone())))
-    }
-}
+//     #[inline(always)]
+//     fn to_foreign(local: &'a T) -> Result<*const T, Self::Error> {
+//         Ok(Box::into_raw(Box::new(local.clone())))
+//     }
+// }
 
-impl<'a, T: Clone> ToForeign<&'a T, *mut T> for BoxMarshaler<T> {
-    type Error = Infallible;
+// impl<'a, T: Clone> ToForeign<&'a T, *mut T> for BoxMarshaler<T> {
+//     type Error = Infallible;
     
-    #[inline(always)]
-    fn to_foreign(local: &'a T) -> Result<*mut T, Self::Error> {
-        Ok(Box::into_raw(Box::new(local.clone())))
-    }
-}
+//     #[inline(always)]
+//     fn to_foreign(local: &'a T) -> Result<*mut T, Self::Error> {
+//         Ok(Box::into_raw(Box::new(local.clone())))
+//     }
+// }
 
 impl<T: ?Sized> ToForeign<Box<T>, *mut T> for BoxMarshaler<T> {
     type Error = Infallible;
@@ -327,17 +324,17 @@ impl<'a> FromForeign<*mut libc::c_char, String> for StrMarshaler<'a> {
     }
 }
 
-/// Magical catch-all implementation for `Result<Local, Error>`.
-impl<T, Foreign, Local> ToForeignResult<Local, Foreign> for T
-where
-    T: ToForeign<Local, Foreign>,
-{
-    type Error = T::Error;
+// Magical catch-all implementation for `Result<Local, Error>`.
+// impl<T, Foreign, Local> ToForeign<Result<Local, T::Error>, Foreign> for T
+// where
+//     T: ToForeign<Local, Foreign>,
+// {
+//     type Error = T::Error;
 
-    fn to_foreign(result: Result<Local, T::Error>) -> Result<Foreign, Self::Error> {
-        match result {
-            Ok(v) => <Self as ToForeign<Local, Foreign>>::to_foreign(v),
-            Err(e) => Err(e),
-        }
-    }
-}
+//     fn to_foreign(result: Result<Local, T::Error>) -> Result<Foreign, Self::Error> {
+//         match result {
+//             Ok(v) => <Self as ToForeign<Local, Foreign>>::to_foreign(v),
+//             Err(e) => Err(e),
+//         }
+//     }
+// }

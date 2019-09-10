@@ -201,7 +201,8 @@ fn impl_life() {
         InvokeParams { return_marshaler: None, prefix: Some("ex_pref_".to_string()) },
         quote! {
             impl Something {
-                pub fn new(item: &str) -> Something {
+                #[marshal(::cursed::BoxMarshaler)]
+                pub fn new(item: Cow<str>) -> Something {
                     Something { item }
                 }
 
@@ -235,23 +236,23 @@ fn impl_life() {
             __handle: *mut ::libc::c_void,
             __exception: ::cursed::ErrCallback,
         ) {
-            ::cursed::try_not_null!(
-                ::cursed::BoxMarshaler::from_foreign_as_owned(__handle),
-                __exception,
+            let _: Box<Something> = ::cursed::try_not_null!(
+                ::cursed::BoxMarshaler::from_foreign(__handle),
+                __exception
             );
-            log::debug!("ex_pref_something_free has consumed this handle; do not reuse it!");
+            log::debug!("`{}` has consumed this handle; do not reuse it!", stringify!(ex_pref_something_free));
             unsafe { *__handle = std::ptr::null_mut(); }
         }
 
         #[no_mangle]
         pub extern "C" fn ex_pref_something_new(
-            item: *const ::libc::c_str,
+            item: *const ::libc::c_char,
             __exception: ::cursed::ErrCallback
         ) -> *mut ::libc::c_void {
-            let item = ::cursed::try_not_null!(
+            let item: Cow<str> = ::cursed::try_not_null!(
                 ::cursed::StrMarshaler::from_foreign(item),
                 __exception,
-                std::ptr::null_mut(),
+                std::ptr::null_mut()
             );
             let result = Something::new(item);
             match ::cursed::BoxMarshaler::to_foreign(result) {
@@ -261,19 +262,19 @@ fn impl_life() {
         }
 
         #[no_mangle]
-        pub extern "C" fn ex_pref_something_act_upon_ref(__handle: *const c_void, __exception: ::cursed::ErrCallback) {
-            let __handle = ::cursed::try_not_null!(
-                ::cursed::BoxMarshaler::from_foreign_as_ref(__handle),
-                __exception,
+        pub extern "C" fn ex_pref_something_act_upon_ref(__handle: *const ::libc::c_void, __exception: ::cursed::ErrCallback) {
+            let __handle: &Something = ::cursed::try_not_null!(
+                ::cursed::BoxMarshaler::from_foreign(__handle),
+                __exception
             );
             Something::act_upon_ref(__handle);
         }
 
         #[no_mangle]
-        pub extern "C" fn ex_pref_something_act_upon_consume(__handle: *mut c_void, __exception: ::cursed::ErrCallback) {
-            let __handle = ::cursed::try_not_null!(
-                ::cursed::BoxMarshaler::from_foreign_as_owned(__handle),
-                __exception,
+        pub extern "C" fn ex_pref_something_act_upon_consume(__handle: *mut ::libc::c_void, __exception: ::cursed::ErrCallback) {
+            let __handle: Something = ::cursed::try_not_null!(
+                ::cursed::BoxMarshaler::from_foreign(__handle),
+                __exception
             );
             Something::act_upon_consume(__handle);
             log::debug!("act_upon has consumed this handle; do not reuse it!");
@@ -281,12 +282,12 @@ fn impl_life() {
         }
 
         #[no_mangle]
-        pub extern "C" fn ex_pref_something_act_upon_mut_ref(__handle: *mut c_void, __exception: ::cursed::ErrCallback) {
-            let __handle = ::cursed::try_not_null!(
-                ::cursed::BoxMarshaler::from_foreign_as_ref_mut(__handle),
-                __exception,
+        pub extern "C" fn ex_pref_something_act_upon_mut_ref(__handle: *mut ::libc::c_void, __exception: ::cursed::ErrCallback) {
+            let __handle: &mut Something = ::cursed::try_not_null!(
+                ::cursed::BoxMarshaler::from_foreign(__handle),
+                __exception
             );
-            Something::act_upon_ref(__handle);
+            Something::act_upon_mut_ref(__handle);
         }
 
         #[no_mangle]
