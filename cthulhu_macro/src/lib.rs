@@ -4,6 +4,14 @@ use quote::quote;
 use std::fmt::Display;
 use syn::{punctuated::Punctuated, spanned::Spanned};
 use heck::SnakeCase;
+use ctor::ctor;
+
+use log::{debug, error};
+
+#[ctor]
+fn init() {
+    pretty_env_logger::init();
+}
 
 #[derive(Debug)]
 struct Mapping {
@@ -12,8 +20,28 @@ struct Mapping {
 }
 
 impl Mapping {
-    fn self_type(parent: &syn::Type) -> Mapping {
-        Mapping { output_type: parent.clone(), marshaler: MarshalAttr::self_type() }
+    fn self_type(receiver: &syn::Receiver, parent: &syn::Type) -> Result<Mapping, syn::Error> {
+        let syn::Receiver { reference, mutability, .. } = receiver.clone();
+
+        let path = match parent {
+            syn::Type::Path(path) => path,
+            e => return Err(syn::Error::new_spanned(&e, "not a valid self type path"))
+        };
+        
+        let output_type = match (reference, mutability) {
+            (None, _) => syn::Type::Path(path.clone()),
+            (Some((and_token, lifetime)), mutability) => syn::Type::Reference(syn::TypeReference {
+                and_token,
+                lifetime,
+                mutability,
+                elem: Box::new(syn::Type::Path(path.clone()))
+            })
+        };
+
+        Ok(Mapping {
+            output_type,
+            marshaler: MarshalAttr::self_type()
+        })
     }
 }
 
@@ -116,14 +144,14 @@ fn collect_mappings_from_sig(
                 syn::FnArg::Typed(t) => t,
                 syn::FnArg::Receiver(receiver) => {
                     if let Some(parent_type) = parent_type {
-                        return Some(Ok(Mapping::self_type(parent_type)))
+                        return Some(Mapping::self_type(receiver, parent_type))
                     } else {
                         return Some(Err(syn::Error::new_spanned(&receiver, "no self type found; using invoke wrong?")));
                     }
                 },
             };
 
-            println!("{}", quote!{ #input });
+            // debug!("{}", quote!{ #input });
             let mut unhandled_attrs = vec![];
 
             std::mem::swap(&mut input.attrs, &mut unhandled_attrs);
@@ -194,16 +222,31 @@ pub fn call_with(
 ) -> Result<TokenStream, syn::Error> {
     let item: syn::Item = syn::parse2(item.clone()).context("error parsing function body")?;
     match item {
-        syn::Item::Fn(item) => call_with_function(invoke_params.return_marshaler, item, None),
-        syn::Item::Impl(item) => call_with_impl(invoke_params.prefix, item),
-        _ => Err(syn::Error::new_spanned(&item, "Only supported on functions and impls")),
+        syn::Item::Fn(item) => {
+            call_with_function(invoke_params.return_marshaler, item, None)
+        },
+        syn::Item::Impl(item) => {
+            call_with_impl(invoke_params.prefix, item)
+        },
+        item => {
+            error!("{:?}", &item);
+            Err(syn::Error::new_spanned(&item, "Only supported on functions and impls"))
+        }
     }
 }
 
 fn call_with_impl(
     prefix: Option<String>,
-    item: syn::ItemImpl,
+    mut item: syn::ItemImpl,
 ) -> Result<TokenStream, syn::Error> {
+    debug!("{}", {
+        let mut item = item.clone();
+        item.items = vec![];
+        quote! { #item }
+    });
+    
+    // let original_impl = item.clone();
+
     if let Some(defaultness) = item.defaultness {
         return Err(syn::Error::new_spanned(&defaultness, "Does not support specialised impls"));
     }
@@ -220,10 +263,10 @@ fn call_with_impl(
         return Err(syn::Error::new_spanned(&trait_.1, "Does not support trait impls"));
     }
 
-    let self_ty = item.self_ty;
+    let self_ty = &*item.self_ty;
     let invoke_prefix = prefix.unwrap_or_else(|| "".into());
     let prefix = format!("{}_{}", invoke_prefix, quote! { #self_ty }).to_snake_case();
-    let pub_methods = item.items.into_iter().filter_map(|impl_item| match impl_item {
+    let pub_methods = item.items.iter_mut().filter_map(|impl_item| match impl_item {
         syn::ImplItem::Method(method) => match (
             &method.vis,
             method.sig.asyncness,
@@ -237,25 +280,27 @@ fn call_with_impl(
         _ => None,
     });
 
-    let pub_method_names = pub_methods
-        .map(|mut x| {
+    let foreign_methods = pub_methods
+        .map(|x| {
             let ident = &x.sig.ident;
             let fn_path: syn::Path = syn::parse2(quote! { #self_ty::#ident })?;
             let c_ident: syn::Ident = syn::parse_str(&format!("{}_{}", prefix, &ident).to_snake_case()).unwrap();
-            // let mut fn_item = syn::ItemFn {
-            //     attrs: vec![],
-            //     vis: syn::Visibility::Inherited,
-            //     sig: x.sig,
-            //     block: Box::new(x.block)
-            // };
+            
             let mappings = collect_mappings_from_sig(Some(&*self_ty), &mut x.sig)?;
             
-            let mut idents = x.attrs
+            debug!("impl fn {}", quote! { #fn_path });
+            debug!("impl fn def: {}", quote! { #x });
+
+            let mut attrs = vec![];
+            std::mem::swap(&mut attrs, &mut x.attrs);
+
+            let mut idents = attrs
                 .into_iter()
                 .filter_map(|item| {
+                    debug!("attr {}", quote! { #item });
                     match MarshalAttr::from_attribute(item.clone()) {
                         Ok(None) => {
-                            // fn_item.attrs.push(item);
+                            x.attrs.push(item);
                             return None;
                         },
                         Ok(Some(v)) => Some(Ok(v)),
@@ -263,10 +308,10 @@ fn call_with_impl(
                     }
                 })
                 .collect::<Result<Vec<_>, _>>()?;
+
             let attr = idents.pop();
 
             let syn::Signature {
-                ident: name,
                 inputs: params,
                 output: local_return_type,
                 ..
@@ -280,35 +325,53 @@ fn call_with_impl(
             let return_type = ReturnType::new(fn_marshal_attr.as_ref(), local_return_type)?;
             let function = Function::new(c_ident, params, &mappings, return_type, InnerFn::FunctionCall(fn_path), fn_marshal_attr)?;
 
+            debug!("{:#?}", &function);
+
             function.to_token_stream()
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    let free_ident: syn::Ident = syn::parse_str(&format!("{}_free", prefix).to_snake_case()).unwrap();
+    // let free_ident: syn::Ident = syn::parse_str(&format!("{}_free", prefix).to_snake_case()).unwrap();
 
+    // TODO: generate free from a struct only
     Ok(quote! {
-        #[no_mangle]
-        pub extern "C" fn #free_ident(
-            __handle: *mut ::libc::c_void,
-            __exception: ::cursed::ErrCallback,
-        ) {
-            let _: Box<#self_ty> = ::cursed::try_not_null!(
-                ::cursed::BoxMarshaler::from_foreign(__handle),
-                __exception
-            );
-            log::debug!("`{}` has consumed this handle; do not reuse it!", stringify!(#free_ident));
-            unsafe {
-                *__handle = std::ptr::null_mut();
-            }
-        }
+        // #[no_mangle]
+        // pub extern "C" fn #free_ident(
+        //     __handle: *mut ::libc::c_void,
+        //     __exception: ::cursed::ErrCallback,
+        // ) {
+        //     let _: Box<#self_ty> = ::cursed::try_not_null!(
+        //         ::cursed::BoxMarshaler::from_foreign(__handle),
+        //         __exception
+        //     );
+        //     log::debug!("`{}` has consumed this handle; do not reuse it!", stringify!(#free_ident));
+        //     unsafe {
+        //         *__handle = std::ptr::null_mut();
+        //     }
+        // }
+        #item
 
-        #(#pub_method_names)*
+        #(#foreign_methods)*
     })
 }
 
 struct ReturnType {
     local: syn::ReturnType,
     foreign: syn::ReturnType,
+}
+
+impl std::fmt::Debug for ReturnType {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let ReturnType {
+            local,
+            foreign
+        } = &self;
+
+        fmt.debug_struct("ReturnType")
+            .field("local", &format!("{}", quote! { #local }))
+            .field("foreign", &format!("{}", quote! { #foreign }))
+            .finish()
+    }
 }
 
 impl ReturnType {
@@ -346,6 +409,9 @@ impl ReturnType {
     }
 }
 
+// use serde_derive::Serialize;
+
+#[derive(Debug)]
 enum InnerFn {
     FunctionBody(syn::ItemFn),
     FunctionCall(syn::Path)
@@ -359,6 +425,28 @@ struct Function {
     from_foreigns: TokenStream,
     inner_fn: InnerFn,
     fn_marshal_attr: Option<MarshalAttr>,
+}
+
+impl std::fmt::Debug for Function {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let Function {
+            name,
+            foreign_params,
+            foreign_args,
+            from_foreigns,
+            ..
+        } = &self;
+
+        fmt.debug_struct("Function")
+            .field("name", &format!("{}", quote! { #name }))
+            .field("foreign_params", &format!("{}", quote! { #foreign_params }))
+            .field("foreign_args", &format!("{}", quote! { #foreign_args }))
+            .field("return_type", &self.return_type)
+            .field("from_foreigns", &format!("{}", quote! { #from_foreigns }))
+            .field("inner_fn", &self.inner_fn)
+            .field("fn_marshal_attr", &self.fn_marshal_attr)
+            .finish()
+    }
 }
 
 impl Function {
@@ -393,9 +481,9 @@ impl Function {
                 from_foreigns.extend(foreign);
                 has_exceptions = true;
             } else if !is_passthrough_type(&*out_type) {
-                println!("OUT TY: {}, {:?}", quote! { #name }, &*out_type);
-                println!("{:?}", mapping);
-                println!("{:?}", fn_marshal_attr);
+                error!("OUT TY: {}, {:?}", quote! { #name }, &*out_type);
+                error!("Mapping: {:?}", mapping);
+                error!("Marshal attr: {:?}", fn_marshal_attr);
                 return Err(syn::Error::new_spanned(&param, "no marshaler found for type"));
             }
 
@@ -522,6 +610,10 @@ fn call_with_function(
     mut fn_item: syn::ItemFn,
     parent_type: Option<&syn::Type>
 ) -> Result<TokenStream, syn::Error> {
+    debug!("fn {}", {
+        let ident = &fn_item.sig.ident;
+        quote! { #ident }
+    });
     let mappings = collect_mappings_from_sig(parent_type, &mut fn_item.sig)?;
 
     let syn::Signature {
@@ -564,19 +656,6 @@ fn to_c_arg(arg: &syn::FnArg) -> Result<syn::Pat, syn::Error> {
         syn::FnArg::Receiver(receiver) => {
             Ok(syn::parse2(quote! { __handle }).unwrap())
         }
-    // if let Some(syn::FnArg::Receiver(_)) = sig.inputs.first() {
-    //     // TODO: handle mutability, etc on self
-    //     self_ref = Some(syn::PatType {
-    //         attrs: vec![],
-    //         pat: syn::parse2(quote! { __handle }).unwrap(),
-    //         colon_token: <syn::Token![:]>::default(),
-    //         ty: Box::new(syn::parse2(quote! { *const ::libc::c_void }).unwrap())
-    //     });
-    // }
-        // e => {
-        //     println!("{:?}", e);
-        //     Err(syn::Error::new(arg.span(), "cannot arg"))
-        // }
     }
 }
 

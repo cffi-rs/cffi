@@ -209,6 +209,27 @@ fn impl_life() {
                 fn some_internal_function(foo: u8) {
 
                 }
+                
+                pub fn value(&self, value: u8) {
+
+                }
+
+                pub fn value_ref(&self, value: Cow<str>) {
+                    
+                }
+
+                pub fn value_ref_ret(&self, value: Cow<str>) -> u32 {
+                    
+                }
+
+                #[marshal(::cursed::BoxMarshaler)]
+                pub fn value_ref_ret_owned(&self, value: Cow<str>) -> Something {
+                    
+                }
+                
+                // pub fn value_ref_mut(&mut self, value: &mut u8) {
+                    
+                // }
 
                 pub fn act_upon_ref(&self) {
 
@@ -295,5 +316,5 @@ fn impl_life() {
             Something::do_something_static();
         }
     };
-    assert_tokens_eq!(res, expected);
+    assert_tokens_eq!(expected, res);
 }

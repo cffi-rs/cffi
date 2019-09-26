@@ -49,6 +49,7 @@ macro_rules! type_array {
 fn main() {
     let default_marshalers: HashMap<Type, syn::Path> = map_marshalers![
         bool => ::cursed::BoolMarshaler,
+        &str => ::cursed::StrMarshaler,
         Cow<str> => ::cursed::StrMarshaler,
         Arc<str> => ::cursed::ArcMarshaler::<str>,
         Arc<T> => ::cursed::ArcMarshaler<T>,
@@ -65,8 +66,8 @@ fn main() {
         u32 => ::libc::c_uint,
         i64 => ::libc::c_long,
         u64 => ::libc::c_ulong,
-        &'a str => *const ::libc::c_char,
-        &'a CStr => *const ::libc::c_char,
+        &str => *const ::libc::c_char,
+        &CStr => *const ::libc::c_char,
         CString => *mut ::libc::c_char,
         Arc<str> => *const ::libc::c_char,
         Cow<str> => *const ::libc::c_char,

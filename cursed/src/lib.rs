@@ -104,23 +104,23 @@ pub trait FromForeign<Foreign, Local>: Sized {
 /// ```
 pub struct BoxMarshaler<T: ?Sized>(PhantomData<T>);
 
-// impl<T> ToForeign<T, *const libc::c_void> for BoxMarshaler<T> {
-//     type Error = Infallible;
+impl<T> ToForeign<T, *const libc::c_void> for BoxMarshaler<T> {
+    type Error = Infallible;
     
-//     #[inline(always)]
-//     fn to_foreign(local: T) -> Result<*const libc::c_void, Self::Error> {
-//         Ok(Box::into_raw(Box::new(local)) as *const _ as *const _)
-//     }
-// }
+    #[inline(always)]
+    fn to_foreign(local: T) -> Result<*const libc::c_void, Self::Error> {
+        Ok(Box::into_raw(Box::new(local)) as *const _ as *const _)
+    }
+}
 
-// impl<T> ToForeign<T, *mut libc::c_void> for BoxMarshaler<T> {
-//     type Error = Infallible;
+impl<T> ToForeign<T, *mut libc::c_void> for BoxMarshaler<T> {
+    type Error = Infallible;
     
-//     #[inline(always)]
-//     fn to_foreign(local: T) -> Result<*mut libc::c_void, Self::Error> {
-//         Ok(Box::into_raw(Box::new(local)) as *mut _ as *mut _)
-//     }
-// }
+    #[inline(always)]
+    fn to_foreign(local: T) -> Result<*mut libc::c_void, Self::Error> {
+        Ok(Box::into_raw(Box::new(local)) as *mut _ as *mut _)
+    }
+}
 
 // impl<'a, T: Clone> ToForeign<&'a T, *const T> for BoxMarshaler<T> {
 //     type Error = Infallible;
@@ -140,27 +140,27 @@ pub struct BoxMarshaler<T: ?Sized>(PhantomData<T>);
 //     }
 // }
 
-impl<T: ?Sized> ToForeign<Box<T>, *mut T> for BoxMarshaler<T> {
-    type Error = Infallible;
+// impl<T: ?Sized> ToForeign<Box<T>, *mut T> for BoxMarshaler<T> {
+//     type Error = Infallible;
     
-    #[inline(always)]
-    fn to_foreign(local: Box<T>) -> Result<*mut T, Self::Error> {
-        Ok(Box::into_raw(local))
-    }
-}
+//     #[inline(always)]
+//     fn to_foreign(local: Box<T>) -> Result<*mut T, Self::Error> {
+//         Ok(Box::into_raw(local))
+//     }
+// }
 
-impl<'a, T: ?Sized> FromForeign<*mut T, &'a mut T> for BoxMarshaler<T> {
-    type Error = Box<dyn Error>;
+// impl<'a, T: ?Sized> FromForeign<*mut T, &'a mut T> for BoxMarshaler<T> {
+//     type Error = Box<dyn Error>;
     
-    #[inline(always)]
-    fn from_foreign(foreign: *mut T) -> Result<&'a mut T, Self::Error> {
-        if foreign.is_null() {
-            return Err(null_ptr_error());
-        }
+//     #[inline(always)]
+//     fn from_foreign(foreign: *mut T) -> Result<&'a mut T, Self::Error> {
+//         if foreign.is_null() {
+//             return Err(null_ptr_error());
+//         }
 
-        Ok(unsafe { &mut *foreign })
-    }
-}
+//         Ok(unsafe { &mut *foreign })
+//     }
+// }
 
 impl<'a, T: ?Sized> FromForeign<*const T, &'a T> for BoxMarshaler<T> {
     type Error = Box<dyn Error>;
@@ -221,12 +221,12 @@ impl<T: ?Sized> FromForeign<*const T, Arc<T>> for ArcMarshaler<T> {
     }
 }
 
-impl<T: ?Sized> ToForeign<Arc<T>, *const T> for ArcMarshaler<T> {
+impl<T: ?Sized> ToForeign<Arc<T>, *const libc::c_void> for ArcMarshaler<T> {
     type Error = Arc<dyn Error>;
 
     #[inline(always)]
-    fn to_foreign(arced: Arc<T>) -> Result<*const T, Self::Error> {
-        Ok(Arc::into_raw(arced))
+    fn to_foreign(arced: Arc<T>) -> Result<*const libc::c_void, Self::Error> {
+        Ok(Arc::into_raw(arced) as *const _ as *const _)
     }
 }
 
