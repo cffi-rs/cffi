@@ -57,6 +57,7 @@ fn main() {
     ];
 
     let type_mapping: std::collections::HashMap<Type, Type> = map_types![
+        () => (),
         bool => u8,
         u8 => ::libc::c_uchar,
         i8 => ::libc::c_char,

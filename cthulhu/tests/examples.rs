@@ -196,6 +196,51 @@ fn fuu() {
 }
 
 #[test]
+fn invoke_syntax() {
+    let res = call_with(
+        InvokeParams { return_marshaler: None, prefix: Some("ex_pref_".to_string()) },
+        quote! {
+            impl Something {
+                #[marshal(
+                    fn(cursed::StrMarshaler, _, cursed::StrMarshaler) -> cursed::BoxMarshaler
+                )]
+                pub fn new(a: &str, b: u32, c: &str) -> Something {
+                    Something { item }
+                }
+            }
+        }
+    ).unwrap();
+    
+    let expected = quote! {
+        #[no_mangle]
+        pub extern "C" fn ex_pref_something_new(
+            a: *const ::libc::c_char,
+            b: u32,
+            c: *const ::libc::c_char,
+            __exception: ::cursed::ErrCallback
+        ) -> *mut ::libc::c_void {
+            let a: &str = ::cursed::try_not_null!(
+                ::cursed::StrMarshaler::from_foreign(item),
+                __exception,
+                std::ptr::null_mut()
+            );
+            let c: &str = ::cursed::try_not_null!(
+                ::cursed::StrMarshaler::from_foreign(item),
+                __exception,
+                std::ptr::null_mut()
+            );
+            let result = Something::new(a, b, c);
+            match ::cursed::BoxMarshaler::to_foreign(result) {
+                Ok(v) => v,
+                Err(e) => ::cursed::throw!(e, __exception, std::ptr::null_mut())
+            }
+        }
+    };
+
+    assert_tokens_eq!(res, expected);
+}
+
+#[test]
 fn impl_life() {
     let res = call_with(
         InvokeParams { return_marshaler: None, prefix: Some("ex_pref_".to_string()) },

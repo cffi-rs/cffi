@@ -11,8 +11,6 @@ use std::{
 #[macro_export]
 macro_rules! throw {
     ($error:path, $ex:ident, $fallback:expr) => {{
-        use std::default::Default;
-
         if let Some(callback) = $ex {
             let err = format!("{:?}", $error);
             let s = std::ffi::CString::new(err)

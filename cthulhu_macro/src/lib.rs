@@ -97,6 +97,28 @@ impl MarshalAttr {
         }))
     }
 
+    fn from_bare_fn(bare_fn: syn::TypeBareFn) -> Result<Option<MarshalAttr>, syn::Error> {
+        if bare_fn.lifetimes.is_some() {
+            return Err(syn::Error::new_spanned(bare_fn, "Marshal fn may not have lifetimes"));
+        }
+
+        if bare_fn.unsafety.is_some() {
+            return Err(syn::Error::new_spanned(bare_fn, "Marshal fn may not have unsafety"));
+        }
+
+        if bare_fn.abi.is_some() {
+            return Err(syn::Error::new_spanned(bare_fn, "Marshal fn may not have abi"));
+        }
+
+        if bare_fn.variadic.is_some() {
+            return Err(syn::Error::new_spanned(bare_fn, "Marshal fn may not have variadic"));
+        }
+
+        // TODO: not this, not here.
+
+        Ok(None)
+    }
+
     fn from_attribute(attr: syn::Attribute) -> Result<Option<MarshalAttr>, syn::Error> {
         match attr.path.segments.first() {
             Some(v) => {
@@ -116,9 +138,12 @@ impl MarshalAttr {
             }
         };
 
-        let path: syn::Path = match marshal_ty {
+        println!("{:?}", &marshal_ty);
+
+        match marshal_ty {
             syn::Type::Paren(path) => match *path.elem {
-                syn::Type::Path(path) => path.path,
+                syn::Type::Path(path) => Self::from_path(path.path),
+                syn::Type::BareFn(bare_fn) => Self::from_bare_fn(bare_fn),
                 e => {
                     return Err(syn::Error::new(e.span(), "Must be a path"));
                 }
@@ -126,9 +151,7 @@ impl MarshalAttr {
             e => {
                 return Err(syn::Error::new(e.span(), "Must be a path"));
             }
-        };
-
-        Self::from_path(path)
+        }
     }
 }
 
@@ -622,6 +645,8 @@ fn call_with_function(
         output: local_return_type,
         ..
     } = fn_item.sig.clone();
+
+    fn_item.sig.abi = None;
 
     let fn_marshal_attr = match return_marshaler {
         Some(p) => MarshalAttr::from_path(p)?,
