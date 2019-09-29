@@ -2,8 +2,8 @@ use quote::quote;
 use std::fmt::{self, Debug};
 
 use crate::attr::marshal::MarshalAttr;
+use crate::ext::*;
 use crate::ptr_type::PtrType;
-use crate::ForeignTypeExt;
 
 pub struct ReturnType {
     pub local: syn::ReturnType,

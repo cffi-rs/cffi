@@ -3,9 +3,9 @@ use quote::quote;
 use syn::punctuated::Punctuated;
 
 use crate::attr::{marshal::MarshalAttr, Mapping};
+use crate::ext::*;
 use crate::ptr_type::PtrType;
 use crate::return_type::ReturnType;
-use crate::{ErrorExt, ForeignArgExt};
 
 fn gen_foreign(
     marshaler: &syn::Path,
