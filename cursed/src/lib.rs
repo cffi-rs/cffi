@@ -55,48 +55,48 @@ pub trait FromForeign<Foreign, Local>: Sized {
 }
 
 /// The `Box` marshaler is the catch-all just-throw-it-on-the-heap opaque pointer solution.
-/// 
+///
 /// It supports the following modes of operation:
 ///
 /// ### To the foreign interface:
-/// 
+///
 ///   - `T` → `*const/mut T`
 ///   - `Box<T>` → `*const/*mut T`
-/// 
+///
 /// ### From the foreign interface:
-/// 
+///
 ///   - `*const/mut T` → `Box<T>` (owned)
 ///   - `*const T` → `&T` (ref)
 ///   - `*mut T` → `&mut T` (mut ref)
-/// 
+///
 /// ## Freeing `T`
-/// 
+///
 /// Your foreign code should ensure that they call `BoxMarshaler::<*mut/const T, Box<T>>::from_foreign`,
-/// which will allow you to consume the boxed `T` and allow it to drop as per Rust's usual rules. 
-/// 
+/// which will allow you to consume the boxed `T` and allow it to drop as per Rust's usual rules.
+///
 /// ## Example
-/// 
+///
 /// ```rust
 /// use cursed::{BoxMarshaler, FromForeign, ToForeign};
-/// 
+///
 /// struct Something {
 ///     data: Vec<u8>
 /// }
-/// 
+///
 /// fn demo() {
 ///     let something = Something { data: vec![1, 3, 55] };
-/// 
+///
 ///     // BoxMarshaler::to_foreign is Infallible
 ///     let ptr: *const Something = BoxMarshaler::to_foreign(something).unwrap();
-/// 
+///
 ///     /* send `ptr` over ffi, process it in some way, etc */
-/// 
+///
 ///     // This isn't infallible though, checks for null pointers.
 ///     let boxed: Box<Something> = match BoxMarshaler::from_foreign(ptr) {
 ///         Ok(v) => v,
 ///         Err(e) => panic!("!")
 ///     };
-/// 
+///
 ///     // Let the boxed item drop and it is freed. :)
 /// }
 /// ```
@@ -104,7 +104,7 @@ pub struct BoxMarshaler<T: ?Sized>(PhantomData<T>);
 
 impl<T> ToForeign<T, *const libc::c_void> for BoxMarshaler<T> {
     type Error = Infallible;
-    
+
     #[inline(always)]
     fn to_foreign(local: T) -> Result<*const libc::c_void, Self::Error> {
         Ok(Box::into_raw(Box::new(local)) as *const _ as *const _)
@@ -113,7 +113,7 @@ impl<T> ToForeign<T, *const libc::c_void> for BoxMarshaler<T> {
 
 impl<T> ToForeign<T, *mut libc::c_void> for BoxMarshaler<T> {
     type Error = Infallible;
-    
+
     #[inline(always)]
     fn to_foreign(local: T) -> Result<*mut libc::c_void, Self::Error> {
         Ok(Box::into_raw(Box::new(local)) as *mut _ as *mut _)
@@ -122,7 +122,7 @@ impl<T> ToForeign<T, *mut libc::c_void> for BoxMarshaler<T> {
 
 // impl<'a, T: Clone> ToForeign<&'a T, *const T> for BoxMarshaler<T> {
 //     type Error = Infallible;
-    
+
 //     #[inline(always)]
 //     fn to_foreign(local: &'a T) -> Result<*const T, Self::Error> {
 //         Ok(Box::into_raw(Box::new(local.clone())))
@@ -131,7 +131,7 @@ impl<T> ToForeign<T, *mut libc::c_void> for BoxMarshaler<T> {
 
 // impl<'a, T: Clone> ToForeign<&'a T, *mut T> for BoxMarshaler<T> {
 //     type Error = Infallible;
-    
+
 //     #[inline(always)]
 //     fn to_foreign(local: &'a T) -> Result<*mut T, Self::Error> {
 //         Ok(Box::into_raw(Box::new(local.clone())))
@@ -140,7 +140,7 @@ impl<T> ToForeign<T, *mut libc::c_void> for BoxMarshaler<T> {
 
 // impl<T: ?Sized> ToForeign<Box<T>, *mut T> for BoxMarshaler<T> {
 //     type Error = Infallible;
-    
+
 //     #[inline(always)]
 //     fn to_foreign(local: Box<T>) -> Result<*mut T, Self::Error> {
 //         Ok(Box::into_raw(local))
@@ -149,7 +149,7 @@ impl<T> ToForeign<T, *mut libc::c_void> for BoxMarshaler<T> {
 
 // impl<'a, T: ?Sized> FromForeign<*mut T, &'a mut T> for BoxMarshaler<T> {
 //     type Error = Box<dyn Error>;
-    
+
 //     #[inline(always)]
 //     fn from_foreign(foreign: *mut T) -> Result<&'a mut T, Self::Error> {
 //         if foreign.is_null() {

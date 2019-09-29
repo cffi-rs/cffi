@@ -208,9 +208,10 @@ fn invoke_syntax() {
                     Something { item }
                 }
             }
-        }
-    ).unwrap();
-    
+        },
+    )
+    .unwrap();
+
     let expected = quote! {
         #[no_mangle]
         pub extern "C" fn ex_pref_something_new(
@@ -254,26 +255,26 @@ fn impl_life() {
                 fn some_internal_function(foo: u8) {
 
                 }
-                
+
                 pub fn value(&self, value: u8) {
 
                 }
 
                 pub fn value_ref(&self, value: Cow<str>) {
-                    
+
                 }
 
                 pub fn value_ref_ret(&self, value: Cow<str>) -> u32 {
-                    
+
                 }
 
                 #[marshal(::cursed::BoxMarshaler)]
                 pub fn value_ref_ret_owned(&self, value: Cow<str>) -> Something {
-                    
+
                 }
-                
+
                 // pub fn value_ref_mut(&mut self, value: &mut u8) {
-                    
+
                 // }
 
                 pub fn act_upon_ref(&self) {
