@@ -68,6 +68,27 @@ impl std::fmt::Debug for Function {
     }
 }
 
+trait TypeMarshalExt {
+    fn resolve_marshaler<'a>(
+        &self,
+        marshaler_attr: Option<&'a MarshalAttr>,
+    ) -> Result<&'a syn::Path, syn::Error>;
+}
+
+impl TypeMarshalExt for syn::Type {
+    fn resolve_marshaler<'a>(
+        &self,
+        marshaler_attr: Option<&'a MarshalAttr>,
+    ) -> Result<&'a syn::Path, syn::Error> {
+        match marshaler_attr {
+            Some(v) => Ok(&v.path),
+            None => {
+                return Err(syn::Error::new_spanned(&self, "no marshaler found for return type"))
+            }
+        }
+    }
+}
+
 impl Function {
     pub fn new(
         name: syn::Ident,
@@ -145,90 +166,77 @@ impl Function {
         })
     }
 
-    pub fn to_token_stream(&self) -> Result<TokenStream, syn::Error> {
-        let Self {
-            name,
-            foreign_params,
-            foreign_args,
-            return_type,
-            from_foreigns,
-            inner_fn,
-            fn_marshal_attr,
-        } = self;
+    fn build_signature(&self) -> Result<TokenStream, syn::Error> {
+        let Self { name, foreign_params, .. } = self;
 
-        let call_name: syn::Path = match inner_fn {
-            InnerFn::FunctionCall(path) => path.clone(),
-            _ => syn::parse2(quote! { #name }).unwrap(),
+        let mut sig = quote! {
+            #[no_mangle]
+            pub extern "C" fn #name(#foreign_params)
         };
 
-        let original_fn = match inner_fn {
+        if let syn::ReturnType::Type(_, ty) = &self.return_type.local {
+            let return_marshaler = ty.resolve_marshaler(self.fn_marshal_attr.as_ref())?;
+            let ret = quote! { -> <#return_marshaler as ::cursed::ReturnType>::Foreign };
+            sig.extend(ret);
+        }
+
+        Ok(sig)
+    }
+
+    fn build_inner_block(&self) -> Result<TokenStream, syn::Error> {
+        let Self { name, from_foreigns, foreign_args, .. } = self;
+
+        // If we have a function body, inject it or just ignore it
+        let original_fn = match &self.inner_fn {
             InnerFn::FunctionBody(body) => Some(body),
             _ => None,
         };
 
-        match &return_type.local {
-            syn::ReturnType::Default => Ok(quote! {
-                #[no_mangle]
-                pub extern "C" fn #name(#foreign_params) {
-                    #from_foreigns
-                    #original_fn
-                    #call_name(#foreign_args);
-                }
-            }),
+        let mut inner_block = quote! {
+            #from_foreigns
+            #original_fn
+        };
+
+        let call_name: syn::Path = match &self.inner_fn {
+            InnerFn::FunctionCall(path) => path.clone(),
+            _ => syn::parse2(quote! { #name }).unwrap(),
+        };
+
+        match &self.return_type.local {
+            syn::ReturnType::Default => {
+                inner_block.extend(quote! { #call_name(#foreign_args); });
+            }
+            syn::ReturnType::Type(_, ty) if crate::is_passthrough_type(&ty) => {
+                inner_block.extend(quote! { #call_name(#foreign_args) });
+            }
             syn::ReturnType::Type(_, ty) => {
-                let foreign_return = &return_type.foreign;
-
-                if crate::is_passthrough_type(&ty) {
-                    return Ok(quote! {
-                        #[no_mangle]
-                        extern "C" fn #name(#foreign_params) #foreign_return {
-                            #from_foreigns
-                            #original_fn
-                            #call_name(#foreign_args)
-                        }
-                    });
-                }
-
-                let return_marshaler = match fn_marshal_attr.as_ref() {
-                    Some(v) => &v.path,
-                    None => {
-                        return Err(syn::Error::new_spanned(
-                            &ty,
-                            "no marshaler found for return type",
-                        ))
-                    }
-                };
-
-                let err = match return_type.foreign_ptr_type() {
-                    None => match return_type.foreign_type() {
-                        Some(ret) => quote! { ::cursed::throw!(e, __exception, <#ret>::default()) },
-                        None => quote! { ::cursed::throw!(e, __exception) },
-                    },
-                    Some(PtrType::Const) => {
-                        quote! { ::cursed::throw!(e, __exception, std::ptr::null()) }
-                    }
-                    Some(PtrType::Mut) => {
-                        quote! { ::cursed::throw!(e, __exception, std::ptr::null_mut()) }
-                    }
-                };
+                let return_marshaler = ty.resolve_marshaler(self.fn_marshal_attr.as_ref())?;
 
                 let return_to_foreign = quote! {
                     match #return_marshaler::to_foreign(result) {
                         Ok(v) => v,
-                        Err(e) => #err
+                        Err(e) => {
+                            ::cursed::throw!(e, __exception, <#return_marshaler as ::cursed::ReturnType>::foreign_default())
+                        }
                     }
                 };
 
-                Ok(quote! {
-                    #[no_mangle]
-                    pub extern "C" fn #name(#foreign_params) #foreign_return {
-                        #from_foreigns
-                        #original_fn
-                        let result = #call_name(#foreign_args);
-                        #return_to_foreign
-                    }
-                })
+                inner_block.extend(quote! {
+                    let result = #call_name(#foreign_args);
+                    #return_to_foreign
+                });
             }
-        }
+        };
+
+        Ok(inner_block)
+    }
+
+    pub fn to_token_stream(&self) -> Result<TokenStream, syn::Error> {
+        let sig = self.build_signature()?;
+        let inner_block = self.build_inner_block()?;
+
+        Ok(quote! {
+            #sig { #inner_block }
+        })
     }
 }
