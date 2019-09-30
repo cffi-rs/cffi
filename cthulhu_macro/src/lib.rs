@@ -23,7 +23,7 @@ pub fn call_with(
     item: TokenStream,
 ) -> Result<TokenStream, syn::Error> {
     let item: syn::Item = syn::parse2(item.clone()).context("error parsing function body")?;
-    match item {
+    let result = match item {
         syn::Item::Fn(item) => {
             call_fn::call_with_function(invoke_params.return_marshaler, item, None)
         }
@@ -32,7 +32,15 @@ pub fn call_with(
             log::error!("{:?}", &item);
             Err(syn::Error::new_spanned(&item, "Only supported on functions and impls"))
         }
+    };
+
+    if result.is_err() {
+        log::debug!("macro finished with error");
+    } else {
+        log::debug!("macro finished successfully");
     }
+
+    result
 }
 
 include!(concat!(env!("OUT_DIR"), "/codegen.rs"));

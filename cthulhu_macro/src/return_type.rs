@@ -3,7 +3,7 @@ use std::fmt::{self, Debug};
 
 use crate::attr::marshal::MarshalAttr;
 use crate::ext::*;
-use crate::ptr_type::PtrType;
+// use crate::ptr_type::PtrType;
 
 pub struct ReturnType {
     pub local: syn::ReturnType,
@@ -51,7 +51,7 @@ impl ReturnType {
         }
     }
 
-    pub fn foreign_ptr_type(&self) -> Option<PtrType> {
-        PtrType::from(self.foreign_type().as_ref())
-    }
+    // pub fn foreign_ptr_type(&self) -> Option<PtrType> {
+    //     PtrType::from(self.foreign_type().as_ref())
+    // }
 }

@@ -23,7 +23,7 @@ impl ForeignArgExt for syn::Receiver {
             attrs: vec![],
             pat: syn::parse2(quote! { __handle }).unwrap(),
             colon_token: <syn::Token![:]>::default(),
-            ty: Box::new(syn::parse2(quote! { *const ::libc::c_void }).unwrap()),
+            ty: Box::new(syn::parse2(quote! { *const ::std::ffi::c_void }).unwrap()),
         })
     }
 
@@ -62,11 +62,17 @@ impl ForeignTypeExt for syn::Type {
             _ => return Err(syn::Error::new_spanned(self, "Unknown parameters not supported")),
         }
 
+        // Special case for bool
+        let bool_ty: syn::Type = syn::parse_str("bool").unwrap();
+        if self == &bool_ty {
+            return Ok(syn::parse2(quote! { /* bool */ u8 }).unwrap());
+        }
+
         match crate::is_passthrough_type(self) {
             true => Ok(self.clone()),
             false => {
-                let c_ty: syn::Type = syn::parse2(quote! { *const ::libc::c_void }).unwrap();
-                Ok(c_ty.clone())
+                let c_ty: syn::Type = syn::parse2(quote! { *const ::std::ffi::c_void }).unwrap();
+                Ok(c_ty)
             }
         }
     }

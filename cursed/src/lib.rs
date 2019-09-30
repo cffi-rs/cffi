@@ -8,41 +8,31 @@ use std::{
     sync::Arc,
 };
 
-#[macro_export]
-macro_rules! throw {
-    ($error:path, $ex:ident, $fallback:expr) => {{
-        if let Some(callback) = $ex {
-            let err = format!("{:?}", $error);
-            let s = std::ffi::CString::new(err)
-                .unwrap_or_else(|_| std::ffi::CString::new("<unknown>".to_string()).unwrap());
-            callback(s.as_ptr());
-        }
+pub trait ReturnType {
+    type Foreign;
 
-        $fallback
-    }};
-
-    ($error:path, $ex:ident) => {
-        $crate::throw!($error, $ex, ())
-    };
+    fn foreign_default() -> Self::Foreign;
 }
 
-#[macro_export]
-macro_rules! try_not_null {
-    ($path:expr, $ex:ident, $fallback:expr) => {{
-        match $path {
-            Ok(v) => v,
-            Err(e) => {
-                return $crate::throw!(e, $ex, $fallback);
-            }
-        }
-    }};
+impl ReturnType for StrMarshaler<'_> {
+    type Foreign = *const std::ffi::c_void;
 
-    ($path:path, $ex:ident) => {
-        try_not_null!($path, $ex, ())
-    };
+    #[inline(always)]
+    fn foreign_default() -> Self::Foreign {
+        std::ptr::null()
+    }
 }
 
-pub type ErrCallback = Option<extern "C" fn(*const libc::c_char)>;
+impl ReturnType for StringMarshaler {
+    type Foreign = *const std::ffi::c_void;
+
+    #[inline(always)]
+    fn foreign_default() -> Self::Foreign {
+        std::ptr::null()
+    }
+}
+
+pub type ErrCallback = Option<extern "C" fn(*const std::ffi::c_void)>;
 
 pub trait ToForeign<Local, Foreign>: Sized {
     type Error;
@@ -100,13 +90,24 @@ pub trait FromForeign<Foreign, Local>: Sized {
 ///     // Let the boxed item drop and it is freed. :)
 /// }
 /// ```
-pub struct BoxMarshaler<T: ?Sized>(PhantomData<T>);
+pub struct BoxMarshaler<T>(PhantomData<T>);
+
+impl<T> ReturnType for BoxMarshaler<T> {
+    type Foreign = *const std::ffi::c_void;
+
+    fn foreign_default() -> Self::Foreign { std::ptr::null() }
+}
+
+pub struct BoxRefMarshaler<T>(PhantomData<T>);
 
 impl<T> ToForeign<T, *const libc::c_void> for BoxMarshaler<T> {
     type Error = Infallible;
 
     #[inline(always)]
     fn to_foreign(local: T) -> Result<*const libc::c_void, Self::Error> {
+        log::debug!("<BoxMarshaler<{ty}> as ToForeign<{ty}, {o}>>::to_foreign",
+            ty = std::any::type_name::<T>(),
+            o = "*const libc::c_void");
         Ok(Box::into_raw(Box::new(local)) as *const _ as *const _)
     }
 }
@@ -160,42 +161,78 @@ impl<T> ToForeign<T, *mut libc::c_void> for BoxMarshaler<T> {
 //     }
 // }
 
-impl<'a, T: ?Sized> FromForeign<*const T, &'a T> for BoxMarshaler<T> {
+impl<'a, T> FromForeign<*const std::ffi::c_void, &'a T> for BoxRefMarshaler<T> {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn from_foreign(foreign: *const T) -> Result<&'a T, Self::Error> {
+    fn from_foreign(foreign: *const std::ffi::c_void) -> Result<&'a T, Self::Error> {
+        log::debug!("<BoxMarshaler<{ty}> as FromForeign<*const std::ffi::c_void, &'a T>>::from_foreign({:?})",
+            foreign,
+            ty = std::any::type_name::<T>()
+        );
+            
         if foreign.is_null() {
             return Err(null_ptr_error());
         }
 
-        Ok(unsafe { &*foreign as &'a T })
+        let ptr = unsafe { std::mem::transmute::<*const std::ffi::c_void, *const T>(foreign) };
+
+        Ok(unsafe { &*ptr as &'a T })
     }
 }
 
-impl<T: ?Sized> FromForeign<*mut T, Box<T>> for BoxMarshaler<T> {
+impl<'a, T> FromForeign<*const std::ffi::c_void, &'a mut T> for BoxRefMarshaler<T> {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn from_foreign(foreign: *mut T) -> Result<Box<T>, Self::Error> {
+    fn from_foreign(foreign: *const std::ffi::c_void) -> Result<&'a mut T, Self::Error> {
+        log::debug!("<BoxMarshaler<{ty}> as FromForeign<*const std::ffi::c_void, &'a mut T>>::from_foreign({:?})",
+            foreign,
+            ty = std::any::type_name::<T>()
+        );
+            
         if foreign.is_null() {
             return Err(null_ptr_error());
         }
 
-        Ok(unsafe { Box::from_raw(foreign) })
+        let ptr = unsafe { std::mem::transmute::<*const std::ffi::c_void, *mut T>(foreign) };
+
+        Ok(unsafe { &mut *ptr as &'a mut T })
     }
 }
 
-impl<T> FromForeign<*mut T, T> for BoxMarshaler<T> {
+// impl<T: ?Sized> FromForeign<*mut T, Box<T>> for BoxMarshaler<T> {
+//     type Error = Box<dyn Error>;
+
+//     #[inline(always)]
+//     fn from_foreign(foreign: *mut T) -> Result<Box<T>, Self::Error> {
+//         log::debug!("<BoxMarshaler<{ty}> as FromForeign<*mut {ty}, &'a {ty}>>::from_foreign({:?})",
+//             foreign,
+//             ty = std::any::type_name::<T>()
+//         );
+//         if foreign.is_null() {
+//             return Err(null_ptr_error());
+//         }
+
+//         Ok(unsafe { Box::from_raw(foreign) })
+//     }
+// }
+
+impl<T> FromForeign<*const std::ffi::c_void, T> for BoxMarshaler<T> {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn from_foreign(foreign: *mut T) -> Result<T, Self::Error> {
+    fn from_foreign(foreign: *const std::ffi::c_void) -> Result<T, Self::Error> {
+        log::debug!("<BoxMarshaler<{ty}> as FromForeign<*const std::ffi::c_void, T>>::from_foreign({:?})",
+            foreign,
+            ty = std::any::type_name::<T>()
+        );
+
         if foreign.is_null() {
             return Err(null_ptr_error());
         }
 
-        Ok(*unsafe { Box::from_raw(foreign) })
+        Ok(*unsafe { Box::from_raw(foreign as *mut _) })
     }
 }
 
@@ -249,76 +286,92 @@ impl ToForeign<bool, u8> for BoolMarshaler {
 }
 
 pub struct StrMarshaler<'a>(&'a PhantomData<()>);
+pub struct StringMarshaler;
 
-impl ToForeign<String, *const libc::c_char> for StrMarshaler<'_> {
+
+impl ToForeign<String, *const std::ffi::c_void> for StringMarshaler {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn to_foreign(string: String) -> Result<*const libc::c_char, Self::Error> {
+    fn to_foreign(string: String) -> Result<*const std::ffi::c_void, Self::Error> {
         let c_str = std::ffi::CString::new(string)?;
-        Ok(CString::into_raw(c_str))
+        Ok(CString::into_raw(c_str).cast())
     }
 }
 
-impl<'a> ToForeign<&'a str, *const libc::c_char> for StrMarshaler<'a> {
+impl<'a> ToForeign<&'a str, *const std::ffi::c_void> for StrMarshaler<'a> {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn to_foreign(input: &'a str) -> Result<*const libc::c_char, Self::Error> {
+    fn to_foreign(input: &'a str) -> Result<*const std::ffi::c_void, Self::Error> {
         let c_str = CString::new(input)?;
-        Ok(c_str.into_raw())
+        Ok(c_str.into_raw().cast())
     }
 }
 
-impl<'a> FromForeign<*const libc::c_char, &'a str> for StrMarshaler<'a> {
+impl<'a> FromForeign<*const std::ffi::c_void, &'a str> for StrMarshaler<'a> {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn from_foreign(key: *const libc::c_char) -> Result<&'a str, Self::Error> {
+    fn from_foreign(key: *const std::ffi::c_void) -> Result<&'a str, Self::Error> {
         if key.is_null() {
             return Err(null_ptr_error());
         }
 
-        Ok(unsafe { CStr::from_ptr(key) }.to_str()?)
+        Ok(unsafe { CStr::from_ptr(key.cast()) }.to_str()?)
     }
 }
 
-impl<'a> FromForeign<*const libc::c_char, Cow<'a, str>> for StrMarshaler<'a> {
+impl<'a> FromForeign<*const std::ffi::c_void, Option<&'a str>> for StrMarshaler<'a> {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn from_foreign(key: *const libc::c_char) -> Result<Cow<'a, str>, Self::Error> {
+    fn from_foreign(key: *const std::ffi::c_void) -> Result<Option<&'a str>, Self::Error> {
+        if key.is_null() {
+            return Ok(None)
+        }
+
+        Ok(Some(unsafe { CStr::from_ptr(key.cast()) }.to_str()?))
+    }
+}
+
+
+impl<'a> FromForeign<*const std::ffi::c_void, Cow<'a, str>> for StrMarshaler<'a> {
+    type Error = Box<dyn Error>;
+
+    #[inline(always)]
+    fn from_foreign(key: *const std::ffi::c_void) -> Result<Cow<'a, str>, Self::Error> {
         if key.is_null() {
             return Err(null_ptr_error());
         }
 
-        Ok(unsafe { CStr::from_ptr(key) }.to_string_lossy())
+        Ok(unsafe { CStr::from_ptr(key.cast()) }.to_string_lossy())
     }
 }
 
-impl<'a> FromForeign<*mut libc::c_char, CString> for StrMarshaler<'a> {
+impl<'a> FromForeign<*mut std::ffi::c_void, CString> for StringMarshaler {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn from_foreign(key: *mut libc::c_char) -> Result<CString, Self::Error> {
+    fn from_foreign(key: *mut std::ffi::c_void) -> Result<CString, Self::Error> {
         if key.is_null() {
             return Err(null_ptr_error());
         }
 
-        Ok(unsafe { CString::from_raw(key) })
+        Ok(unsafe { CString::from_raw(key.cast()) })
     }
 }
 
-impl<'a> FromForeign<*mut libc::c_char, String> for StrMarshaler<'a> {
+impl<'a> FromForeign<*const std::ffi::c_void, String> for StringMarshaler {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn from_foreign(key: *mut libc::c_char) -> Result<String, Self::Error> {
+    fn from_foreign(key: *const std::ffi::c_void) -> Result<String, Self::Error> {
         if key.is_null() {
             return Err(null_ptr_error());
         }
 
-        Ok(unsafe { CString::from_raw(key) }.into_string()?)
+        Ok(unsafe { CString::from_raw(key as *mut _) }.into_string()?)
     }
 }
 

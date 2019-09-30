@@ -95,8 +95,6 @@ impl MarshalAttr {
             Err(e) => return Err(e),
         };
 
-        println!("{:?}", &marshal_ty);
-
         match marshal_ty {
             syn::Type::Paren(path) => match *path.elem {
                 syn::Type::Path(path) => Self::from_path(path.path),

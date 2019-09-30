@@ -4,8 +4,33 @@ use syn::punctuated::Punctuated;
 
 use crate::attr::{marshal::MarshalAttr, Mapping};
 use crate::ext::*;
-use crate::ptr_type::PtrType;
+// use crate::ptr_type::PtrType;
 use crate::return_type::ReturnType;
+
+fn gen_throw(fallback: Option<TokenStream>) -> TokenStream {
+    quote! {
+        {
+            if let Some(callback) = __exception {
+                let err = format!("{:?}", e);
+                let s = std::ffi::CString::new(err)
+                    .unwrap_or_else(|_| std::ffi::CString::new("<unknown>".to_string()).unwrap());
+                callback(s.as_ptr().cast());
+            }
+            return #fallback;
+        }
+    }
+}
+
+fn gen_try_not_null(path: TokenStream, fallback: Option<TokenStream>) -> TokenStream {
+    let throw = gen_throw(fallback);
+
+    quote! {
+        match #path {
+            Ok(v) => v,
+            Err(e) => #throw
+        }
+    }
+}
 
 fn gen_foreign(
     marshaler: &syn::Path,
@@ -13,27 +38,18 @@ fn gen_foreign(
     out_ty: &syn::Type,
     ret_ty: Option<&syn::Type>,
 ) -> TokenStream {
-    if let Some(ty) = ret_ty {
-        let fallback = match PtrType::from(Some(ty)) {
-            None => quote! { <#ty>::default() },
-            Some(PtrType::Const) => quote! { std::ptr::null() },
-            Some(PtrType::Mut) => quote! { std::ptr::null_mut() },
-        };
-        quote! {
-            let #name: #out_ty = ::cursed::try_not_null!(
-                #marshaler::from_foreign(#name),
-                __exception,
-                #fallback
-            );
-        }
-    } else {
-        quote! {
-            let #name: #out_ty = ::cursed::try_not_null!(
-                #marshaler::from_foreign(#name),
-                __exception
-            );
-        }
-    }
+    let block = gen_try_not_null(
+        quote! { #marshaler::from_foreign(#name) },
+        ret_ty.map(|ty| {
+            if crate::is_passthrough_type(ty) {
+                quote! { <#ty>::default() }
+            } else {
+                quote! { <#ty as ::cursed::ReturnType>::foreign_default() }
+            }
+        }),
+    );
+
+    quote! { let #name: #out_ty = #block; }
 }
 
 #[derive(Debug)]
@@ -83,7 +99,10 @@ impl TypeMarshalExt for syn::Type {
         match marshaler_attr {
             Some(v) => Ok(&v.path),
             None => {
-                return Err(syn::Error::new_spanned(&self, "no marshaler found for return type"))
+                return Err(syn::Error::new_spanned(
+                    &self,
+                    format!("no marshaler found for return type {}", quote! { #self }.to_string()),
+                ));
             }
         }
     }
@@ -175,8 +194,13 @@ impl Function {
         };
 
         if let syn::ReturnType::Type(_, ty) = &self.return_type.local {
-            let return_marshaler = ty.resolve_marshaler(self.fn_marshal_attr.as_ref())?;
-            let ret = quote! { -> <#return_marshaler as ::cursed::ReturnType>::Foreign };
+            let ret = if crate::is_passthrough_type(&ty) {
+                quote! { -> #ty }
+            } else {
+                let return_marshaler = ty.resolve_marshaler(self.fn_marshal_attr.as_ref())?;
+                quote! { -> <#return_marshaler as ::cursed::ReturnType>::Foreign }
+            };
+
             sig.extend(ret);
         }
 
@@ -211,13 +235,13 @@ impl Function {
             }
             syn::ReturnType::Type(_, ty) => {
                 let return_marshaler = ty.resolve_marshaler(self.fn_marshal_attr.as_ref())?;
-
+                let throw = gen_throw(Some(quote! {
+                    <#return_marshaler as ::cursed::ReturnType>::foreign_default()
+                }));
                 let return_to_foreign = quote! {
                     match #return_marshaler::to_foreign(result) {
                         Ok(v) => v,
-                        Err(e) => {
-                            ::cursed::throw!(e, __exception, <#return_marshaler as ::cursed::ReturnType>::foreign_default())
-                        }
+                        Err(e) => #throw
                     }
                 };
 
@@ -236,7 +260,9 @@ impl Function {
         let inner_block = self.build_inner_block()?;
 
         Ok(quote! {
-            #sig { #inner_block }
+            #sig {
+                #inner_block
+            }
         })
     }
 }
