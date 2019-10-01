@@ -95,7 +95,9 @@ pub struct BoxMarshaler<T>(PhantomData<T>);
 impl<T> ReturnType for BoxMarshaler<T> {
     type Foreign = *const std::ffi::c_void;
 
-    fn foreign_default() -> Self::Foreign { std::ptr::null() }
+    fn foreign_default() -> Self::Foreign {
+        std::ptr::null()
+    }
 }
 
 pub struct BoxRefMarshaler<T>(PhantomData<T>);
@@ -105,9 +107,11 @@ impl<T> ToForeign<T, *const libc::c_void> for BoxMarshaler<T> {
 
     #[inline(always)]
     fn to_foreign(local: T) -> Result<*const libc::c_void, Self::Error> {
-        log::debug!("<BoxMarshaler<{ty}> as ToForeign<{ty}, {o}>>::to_foreign",
+        log::debug!(
+            "<BoxMarshaler<{ty}> as ToForeign<{ty}, {o}>>::to_foreign",
             ty = std::any::type_name::<T>(),
-            o = "*const libc::c_void");
+            o = "*const libc::c_void"
+        );
         Ok(Box::into_raw(Box::new(local)) as *const _ as *const _)
     }
 }
@@ -170,7 +174,7 @@ impl<'a, T> FromForeign<*const std::ffi::c_void, &'a T> for BoxRefMarshaler<T> {
             foreign,
             ty = std::any::type_name::<T>()
         );
-            
+
         if foreign.is_null() {
             return Err(null_ptr_error());
         }
@@ -190,7 +194,7 @@ impl<'a, T> FromForeign<*const std::ffi::c_void, &'a mut T> for BoxRefMarshaler<
             foreign,
             ty = std::any::type_name::<T>()
         );
-            
+
         if foreign.is_null() {
             return Err(null_ptr_error());
         }
@@ -223,7 +227,8 @@ impl<T> FromForeign<*const std::ffi::c_void, T> for BoxMarshaler<T> {
 
     #[inline(always)]
     fn from_foreign(foreign: *const std::ffi::c_void) -> Result<T, Self::Error> {
-        log::debug!("<BoxMarshaler<{ty}> as FromForeign<*const std::ffi::c_void, T>>::from_foreign({:?})",
+        log::debug!(
+            "<BoxMarshaler<{ty}> as FromForeign<*const std::ffi::c_void, T>>::from_foreign({:?})",
             foreign,
             ty = std::any::type_name::<T>()
         );
@@ -288,7 +293,6 @@ impl ToForeign<bool, u8> for BoolMarshaler {
 pub struct StrMarshaler<'a>(&'a PhantomData<()>);
 pub struct StringMarshaler;
 
-
 impl ToForeign<String, *const std::ffi::c_void> for StringMarshaler {
     type Error = Box<dyn Error>;
 
@@ -328,13 +332,12 @@ impl<'a> FromForeign<*const std::ffi::c_void, Option<&'a str>> for StrMarshaler<
     #[inline(always)]
     fn from_foreign(key: *const std::ffi::c_void) -> Result<Option<&'a str>, Self::Error> {
         if key.is_null() {
-            return Ok(None)
+            return Ok(None);
         }
 
         Ok(Some(unsafe { CStr::from_ptr(key.cast()) }.to_str()?))
     }
 }
-
 
 impl<'a> FromForeign<*const std::ffi::c_void, Cow<'a, str>> for StrMarshaler<'a> {
     type Error = Box<dyn Error>;

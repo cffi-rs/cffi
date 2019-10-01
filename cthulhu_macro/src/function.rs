@@ -36,6 +36,7 @@ fn gen_foreign(
     marshaler: &syn::Path,
     name: &syn::Pat,
     out_ty: &syn::Type,
+    out_marshaler: Option<&syn::Path>,
     ret_ty: Option<&syn::Type>,
 ) -> TokenStream {
     let block = gen_try_not_null(
@@ -44,7 +45,7 @@ fn gen_foreign(
             if crate::is_passthrough_type(ty) {
                 quote! { <#ty>::default() }
             } else {
-                quote! { <#ty as ::cursed::ReturnType>::foreign_default() }
+                quote! { <#out_marshaler as ::cursed::ReturnType>::foreign_default() }
             }
         }),
     );
@@ -63,6 +64,7 @@ pub struct Function {
     foreign_params: Punctuated<syn::PatType, syn::Token![,]>,
     foreign_args: Punctuated<syn::Pat, syn::Token![,]>,
     return_type: ReturnType,
+    return_marshaler: Option<syn::Path>,
     from_foreigns: TokenStream,
     inner_fn: InnerFn,
     fn_marshal_attr: Option<MarshalAttr>,
@@ -88,23 +90,28 @@ trait TypeMarshalExt {
     fn resolve_marshaler<'a>(
         &self,
         marshaler_attr: Option<&'a MarshalAttr>,
-    ) -> Result<&'a syn::Path, syn::Error>;
+    ) -> Option<&'a syn::Path>;
+}
+
+impl TypeMarshalExt for syn::ReturnType {
+    fn resolve_marshaler<'a>(
+        &self,
+        marshaler_attr: Option<&'a MarshalAttr>,
+    ) -> Option<&'a syn::Path> {
+        match &self {
+            syn::ReturnType::Default => None,
+            syn::ReturnType::Type(_, ty) if crate::is_passthrough_type(&ty) => None,
+            syn::ReturnType::Type(_, ty) => ty.resolve_marshaler(marshaler_attr),
+        }
+    }
 }
 
 impl TypeMarshalExt for syn::Type {
     fn resolve_marshaler<'a>(
         &self,
         marshaler_attr: Option<&'a MarshalAttr>,
-    ) -> Result<&'a syn::Path, syn::Error> {
-        match marshaler_attr {
-            Some(v) => Ok(&v.path),
-            None => {
-                return Err(syn::Error::new_spanned(
-                    &self,
-                    format!("no marshaler found for return type {}", quote! { #self }.to_string()),
-                ));
-            }
-        }
+    ) -> Option<&'a syn::Path> {
+        marshaler_attr.map(|a| &a.path)
     }
 }
 
@@ -120,6 +127,7 @@ impl Function {
         let mut from_foreigns = TokenStream::new();
         let mut foreign_params: Punctuated<syn::PatType, syn::Token![,]> = Punctuated::new();
         let mut foreign_args: Punctuated<syn::Pat, syn::Token![,]> = Punctuated::new();
+        let return_marshaler = return_type.local.resolve_marshaler(fn_marshal_attr.as_ref());
 
         let mut has_exceptions = false;
 
@@ -136,12 +144,12 @@ impl Function {
             {
                 in_type.ty = Box::new(in_ty_override);
             }
-
             if let Some(marshaler) = mapping.marshaler.as_ref() {
                 let foreign = gen_foreign(
                     &marshaler.path,
                     &name,
                     &out_type,
+                    return_marshaler,
                     return_type.foreign_type().as_ref(),
                 );
                 from_foreigns.extend(foreign);
@@ -152,6 +160,7 @@ impl Function {
                     &box_marshaler,
                     &name,
                     &out_type,
+                    return_marshaler,
                     return_type.foreign_type().as_ref(),
                 );
                 from_foreigns.extend(foreign);
@@ -179,6 +188,7 @@ impl Function {
             foreign_params,
             foreign_args,
             return_type,
+            return_marshaler: return_marshaler.map(|x| x.clone()),
             from_foreigns,
             inner_fn,
             fn_marshal_attr,
@@ -197,7 +207,18 @@ impl Function {
             let ret = if crate::is_passthrough_type(&ty) {
                 quote! { -> #ty }
             } else {
-                let return_marshaler = ty.resolve_marshaler(self.fn_marshal_attr.as_ref())?;
+                let return_marshaler = match ty.resolve_marshaler(self.fn_marshal_attr.as_ref()) {
+                    Some(v) => v,
+                    None => {
+                        return Err(syn::Error::new_spanned(
+                            ty,
+                            format!(
+                                "no marshaler found for return type {}",
+                                quote! { #ty }.to_string()
+                            ),
+                        ))
+                    }
+                };
                 quote! { -> <#return_marshaler as ::cursed::ReturnType>::Foreign }
             };
 
@@ -234,7 +255,19 @@ impl Function {
                 inner_block.extend(quote! { #call_name(#foreign_args) });
             }
             syn::ReturnType::Type(_, ty) => {
-                let return_marshaler = ty.resolve_marshaler(self.fn_marshal_attr.as_ref())?;
+                let return_marshaler = match ty.resolve_marshaler(self.fn_marshal_attr.as_ref()) {
+                    Some(v) => v,
+                    None => {
+                        return Err(syn::Error::new_spanned(
+                            ty,
+                            format!(
+                                "no marshaler found for return type {}",
+                                quote! { #ty }.to_string()
+                            ),
+                        ))
+                    }
+                };
+
                 let throw = gen_throw(Some(quote! {
                     <#return_marshaler as ::cursed::ReturnType>::foreign_default()
                 }));
