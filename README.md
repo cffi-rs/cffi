@@ -42,12 +42,15 @@ Let's get more show out of this road.
   - [ ] `Arc<T>`
 - [ ] Make `invoke` syntax consistent with `marshal`
 - [ ] Add debug logging to inform the user when a value has been consumed and should not be reused
+- [ ] Clean up the tests and make them pass
+- [ ] Support types whose representation in C would be multiple parameters or a struct
 
 ### v1.0 series
 
 Let's get this stable.
 
 - [ ] Ability to generate APIs for Kotlin, Swift and C#
+- [ ] Fuzzed so hard that the code is no longer fazed by aggressive abuse and invalid files
 
 ## Background and philosophy
 
