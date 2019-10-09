@@ -2,6 +2,7 @@
 members = [
   "cursed",
   "cthulhu",
+  "cthulhu_cli",
   "cthulhu_tests",
   "cthulhu_macro"
 ]

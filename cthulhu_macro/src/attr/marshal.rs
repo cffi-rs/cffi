@@ -1,4 +1,5 @@
 use quote::quote;
+use std::fmt::{self, Debug};
 
 /// Holds onto the inside of #[marshal(...)]
 ///
@@ -6,10 +7,20 @@ use quote::quote;
 ///    place::Foo::<Bar>
 ///
 ///    MarshalAttr { path: place::Foo, types: [Bar] }
-#[derive(Debug)]
 pub struct MarshalAttr {
     pub path: syn::Path,
     pub types: Vec<syn::Type>,
+}
+
+impl Debug for MarshalAttr {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        let MarshalAttr { path, types } = self;
+
+        fmt.debug_struct("MarshalAttr")
+            .field("path", &quote! { #path }.to_string())
+            .field("types", &types.iter().map(|x| quote! { #x }.to_string()).collect::<Vec<_>>())
+            .finish()
+    }
 }
 
 impl MarshalAttr {

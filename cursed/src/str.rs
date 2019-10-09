@@ -1,12 +1,16 @@
+use std::error::Error;
+use std::ffi::{c_void, CStr, CString};
 use std::marker::PhantomData;
 use std::sync::Arc;
-use std::error::Error;
-use std::ffi::{CString, CStr, c_void};
 
 use super::null_ptr_error;
-use super::{FromForeign, ToForeign, ReturnType};
+use super::{FromForeign, InputType, ReturnType, ToForeign};
 
 pub struct StrMarshaler<'a>(&'a PhantomData<()>);
+
+impl InputType for StrMarshaler<'_> {
+    type Foreign = *const c_void;
+}
 
 impl ReturnType for StrMarshaler<'_> {
     type Foreign = *const c_void;
@@ -16,6 +20,7 @@ impl ReturnType for StrMarshaler<'_> {
         std::ptr::null()
     }
 }
+
 impl<'a> ToForeign<&'a str, *const c_void> for StrMarshaler<'a> {
     type Error = Box<dyn Error>;
 

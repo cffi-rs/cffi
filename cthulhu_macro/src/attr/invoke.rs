@@ -6,4 +6,6 @@ pub struct InvokeParams {
     pub return_marshaler: Option<syn::Path>,
     #[darling(default)]
     pub prefix: Option<String>,
+    #[darling(default)]
+    pub callback: bool,
 }
