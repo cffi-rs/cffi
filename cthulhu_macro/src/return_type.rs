@@ -3,7 +3,6 @@ use std::fmt::{self, Debug};
 
 use crate::attr::marshal::MarshalAttr;
 use crate::ext::*;
-// use crate::ptr_type::PtrType;
 
 pub struct ReturnType {
     pub local: syn::ReturnType,

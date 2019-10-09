@@ -1,7 +1,19 @@
-use super::{FromForeign, ToForeign, ReturnType};
+use super::{FromForeign, InputType, ReturnType, ToForeign};
 use std::convert::Infallible;
 
 pub struct BoolMarshaler;
+
+impl InputType for BoolMarshaler {
+    type Foreign = u8;
+}
+
+impl ReturnType for BoolMarshaler {
+    type Foreign = u8;
+
+    fn foreign_default() -> u8 {
+        0
+    }
+}
 
 impl FromForeign<u8, bool> for BoolMarshaler {
     type Error = Infallible;

@@ -1,12 +1,16 @@
+use std::error::Error;
+use std::ffi::{c_void, CString};
 use std::marker::PhantomData;
 use std::sync::Arc;
-use std::error::Error;
-use std::ffi::{CString, c_void};
 
 use super::null_ptr_error;
-use super::{FromForeign, ToForeign, ReturnType};
+use super::{FromForeign, InputType, ReturnType, ToForeign};
 
 pub struct StringMarshaler;
+
+impl InputType for StringMarshaler {
+    type Foreign = *const c_void;
+}
 
 impl ReturnType for StringMarshaler {
     type Foreign = *const c_void;

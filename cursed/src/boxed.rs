@@ -1,12 +1,11 @@
-
-use std::marker::PhantomData;
-use std::sync::Arc;
+use std::convert::Infallible;
 use std::error::Error;
 use std::ffi::c_void;
-use std::convert::Infallible;
+use std::marker::PhantomData;
+use std::sync::Arc;
 
 use super::null_ptr_error;
-use super::{FromForeign, ToForeign, ReturnType};
+use super::{FromForeign, InputType, ReturnType, ToForeign};
 
 /// The `Box` marshaler is the catch-all just-throw-it-on-the-heap opaque pointer solution.
 ///
@@ -56,6 +55,10 @@ use super::{FromForeign, ToForeign, ReturnType};
 /// ```
 pub struct BoxMarshaler<T>(PhantomData<T>);
 
+impl<T> InputType for BoxMarshaler<T> {
+    type Foreign = *const T;
+}
+
 impl<T> ReturnType for BoxMarshaler<T> {
     type Foreign = *const std::ffi::c_void;
 
@@ -86,7 +89,6 @@ impl<T> ToForeign<T, *mut c_void> for BoxMarshaler<T> {
         Ok(Box::into_raw(Box::new(local)) as *mut _ as *mut _)
     }
 }
-
 
 impl<T> FromForeign<*const std::ffi::c_void, T> for BoxMarshaler<T> {
     type Error = Box<dyn Error>;
@@ -123,7 +125,7 @@ impl<T> FromForeign<*const std::ffi::c_void, T> for BoxMarshaler<T> {
 //         Ok(unsafe { Box::from_raw(foreign) })
 //     }
 // }
-// 
+//
 // impl<'a, T: Clone> ToForeign<&'a T, *const T> for BoxMarshaler<T> {
 //     type Error = Infallible;
 

@@ -8,6 +8,7 @@ use crate::attr::SignatureExt;
 
 pub fn call_with_function(
     return_marshaler: Option<syn::Path>,
+    callback: bool,
     mut fn_item: syn::ItemFn,
     parent_type: Option<&syn::Type>,
 ) -> Result<TokenStream, syn::Error> {
@@ -20,6 +21,19 @@ pub fn call_with_function(
 
     // The wrapped function should not be extern any longer
     fn_item.sig.abi = None;
+
+    // The wrapped function must not be public
+    fn_item.vis = syn::Visibility::Inherited;
+
+    // The wrapper function however should be inlined
+    let attr: syn::Attribute = syn::Attribute {
+        pound_token: <syn::Token![#]>::default(),
+        style: syn::AttrStyle::Outer,
+        bracket_token: syn::token::Bracket::default(),
+        path: syn::parse2(quote! { inline }).unwrap(),
+        tokens: quote! { (always) }
+    };
+    fn_item.attrs.push(attr);
 
     let fn_marshal_attr = match return_marshaler {
         Some(p) => MarshalAttr::from_path(p)?,
@@ -34,6 +48,7 @@ pub fn call_with_function(
         return_type,
         InnerFn::FunctionBody(fn_item),
         fn_marshal_attr,
+        callback
     )?;
 
     function.to_token_stream()

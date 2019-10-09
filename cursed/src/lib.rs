@@ -1,7 +1,7 @@
 use std::{
     convert::Infallible,
     error::Error,
-    ffi::{CStr, CString, c_void},
+    ffi::{c_void, CStr, CString},
     io,
     marker::PhantomData,
     sync::Arc,
@@ -11,15 +11,26 @@ mod arc;
 mod bool;
 mod box_ref;
 mod boxed;
+mod path;
 mod str;
 mod string;
+mod unit;
+mod vec;
+mod vec_ref;
 
-pub use arc::ArcMarshaler;
 pub use self::bool::BoolMarshaler;
+pub use self::path::PathMarshaler;
+pub use self::str::StrMarshaler;
+pub use self::vec::VecMarshaler;
+pub use self::vec_ref::VecRefMarshaler;
+pub use arc::ArcMarshaler;
 pub use box_ref::BoxRefMarshaler;
 pub use boxed::BoxMarshaler;
-pub use self::str::StrMarshaler;
 pub use string::StringMarshaler;
+pub use unit::UnitMarshaler;
+
+pub type ErrCallback = Option<extern "C" fn(*const c_void)>;
+pub type RetCallback<T> = Option<extern "C" fn(T)>;
 
 pub trait ReturnType {
     type Foreign;
@@ -27,8 +38,12 @@ pub trait ReturnType {
     fn foreign_default() -> Self::Foreign;
 }
 
+pub trait InputType {
+    // type Local;
+    type Foreign;
 
-pub type ErrCallback = Option<extern "C" fn(*const c_void)>;
+    // fn local_default() -> Self::Local;
+}
 
 pub trait ToForeign<Local, Foreign>: Sized {
     type Error;
@@ -44,7 +59,6 @@ pub trait FromForeign<Foreign, Local>: Sized {
 fn null_ptr_error() -> Box<io::Error> {
     Box::new(io::Error::new(io::ErrorKind::InvalidData, "null pointer"))
 }
-
 
 // Magical catch-all implementation for `Result<Local, Error>`.
 // impl<T, Foreign, Local> ToForeign<Result<Local, T::Error>, Foreign> for T

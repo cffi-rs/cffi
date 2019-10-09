@@ -1,6 +1,7 @@
 use ctor::ctor;
 use proc_macro2::TokenStream;
 use quote::quote;
+use std::path::PathBuf;
 
 mod attr;
 mod call_fn;
@@ -18,14 +19,60 @@ fn init() {
     pretty_env_logger::init();
 }
 
+fn json_output_path() -> PathBuf {
+    std::path::Path::new(&std::env::var("OUT_DIR").unwrap()).join("cthulhu.json")
+}
+
+fn is_exporting() -> bool {
+    let target = std::env::var("CTHULHU_PKG").ok();
+
+    if let Some(target) = target {
+        let name = match std::env::var("CARGO_PKG_NAME").ok() {
+            Some(v) => v,
+            None => return false,
+        };
+        let version = match std::env::var("CARGO_PKG_VERSION").ok() {
+            Some(v) => v,
+            None => return false,
+        };
+        format!("{}-{}", name, version) == target
+    } else {
+        false
+    }
+}
+
+// pub(crate) struct Context {
+//     pkg_name: String,
+//     pkg_version: String,
+//     cargo_manifest_dir: PathBuf,
+// }
+
+// impl Default for Context {
+//     fn default() -> Context {
+//         Context {
+//             pkg_name: 
+//         }
+//         std::env::var("CARGO_PKG_NAME")
+//         std::env::var("CARGO_PKG_VERSION")
+//         std::env::var("CARGO_MANIFEST_DIR")
+//     }
+// }
+
 pub fn call_with(
     invoke_params: InvokeParams,
     item: TokenStream,
 ) -> Result<TokenStream, syn::Error> {
+    // if let Some(value) = invoke_params.send_help.as_ref() {
+    //     log::debug!("HELP REQUESTED: {}", value);
+    //     return Ok(item);
+    // }
+
+    // log::debug!("{:?} {:?} {:?}", std::env::var("CARGO_PKG_NAME"), std::env::var("CARGO_PKG_VERSION"), std::env::var("CARGO_MANIFEST_DIR"));
+
     let item: syn::Item = syn::parse2(item.clone()).context("error parsing function body")?;
     let result = match item {
         syn::Item::Fn(item) => {
-            call_fn::call_with_function(invoke_params.return_marshaler, item, None)
+            call_fn::call_with_function(invoke_params.return_marshaler, invoke_params.callback, item, None)
         }
         syn::Item::Impl(item) => call_impl::call_with_impl(invoke_params.prefix, item),
         item => {

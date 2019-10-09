@@ -97,6 +97,7 @@ pub(crate) fn call_with_impl(
                 return_type,
                 InnerFn::FunctionCall(fn_path),
                 fn_marshal_attr,
+                false,
             )?;
 
             debug!("{:#?}", &function);

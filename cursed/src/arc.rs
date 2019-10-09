@@ -1,14 +1,26 @@
-use std::marker::PhantomData;
-use std::sync::Arc;
 use std::error::Error;
 use std::ffi::c_void;
+use std::marker::PhantomData;
+use std::sync::Arc;
 
 use super::null_ptr_error;
-use super::{FromForeign, ToForeign, ReturnType};
+use super::{FromForeign, InputType, ReturnType, ToForeign};
 
-pub struct ArcMarshaler<T>(PhantomData<T>);
+pub struct ArcMarshaler;
 
-impl<T> FromForeign<*const c_void, Arc<T>> for ArcMarshaler<T> {
+impl InputType for ArcMarshaler {
+    type Foreign = *const c_void;
+}
+
+impl ReturnType for ArcMarshaler {
+    type Foreign = *const std::ffi::c_void;
+
+    fn foreign_default() -> Self::Foreign {
+        std::ptr::null()
+    }
+}
+
+impl<T> FromForeign<*const c_void, Arc<T>> for ArcMarshaler {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
@@ -21,7 +33,7 @@ impl<T> FromForeign<*const c_void, Arc<T>> for ArcMarshaler<T> {
     }
 }
 
-impl<T> ToForeign<Arc<T>, *const c_void> for ArcMarshaler<T> {
+impl<T> ToForeign<Arc<T>, *const c_void> for ArcMarshaler {
     type Error = Arc<dyn Error>;
 
     #[inline(always)]
@@ -29,4 +41,3 @@ impl<T> ToForeign<Arc<T>, *const c_void> for ArcMarshaler<T> {
         Ok(Arc::into_raw(arced) as *const _ as *const _)
     }
 }
-

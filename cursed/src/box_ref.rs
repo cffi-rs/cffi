@@ -1,13 +1,17 @@
-use std::marker::PhantomData;
-use std::sync::Arc;
 use std::error::Error;
 use std::ffi::c_void;
+use std::marker::PhantomData;
 use std::mem::transmute;
+use std::sync::Arc;
 
 use super::null_ptr_error;
-use super::{FromForeign, ToForeign, ReturnType};
+use super::{FromForeign, InputType, ReturnType, ToForeign};
 
 pub struct BoxRefMarshaler<T>(PhantomData<T>);
+
+impl<T> InputType for BoxRefMarshaler<T> {
+    type Foreign = *const T;
+}
 
 impl<'a, T> FromForeign<*const c_void, &'a T> for BoxRefMarshaler<T> {
     type Error = Box<dyn Error>;
