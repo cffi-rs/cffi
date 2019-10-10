@@ -25,13 +25,12 @@ impl<T> InputType for VecRefMarshaler<T> {
 // }
 
 impl<T> ReturnType for VecRefMarshaler<T> {
-    type Foreign = *const c_void;
+    type Foreign = *const [T];
 
     fn foreign_default() -> Self::Foreign {
-        std::ptr::null()
+        unsafe { std::mem::transmute::<[usize; 2], *const [T]>([0, 0]) }
     }
 }
-
 // impl<&'a T> ToForeign<&'a Vec<T>, *const c_void> for VecRefMarshaler<T> {
 //     type Error = Infallible;
 
@@ -52,6 +51,6 @@ impl<'a, T> FromForeign<*const [T], &'a [T]> for VecRefMarshaler<T> {
         // let boxed: Box<[T]> = unsafe { Box::from_raw(ptr as *mut _) };
 
         // Ok(boxed.into_vec())
-        Ok(unsafe { &*ptr as _ })
+        Ok(unsafe { &*ptr })
     }
 }
