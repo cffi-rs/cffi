@@ -43,6 +43,7 @@ impl<'a, T> FromForeign<*const [T], &'a [T]> for VecRefMarshaler<T> {
     type Error = Box<dyn Error>;
 
     fn from_foreign(ptr: *const [T]) -> Result<&'a [T], Self::Error> {
+        log::debug!("vec ref ptr: {:?}", ptr);
         if ptr.is_null() {
             return Err(null_ptr_error());
         }
