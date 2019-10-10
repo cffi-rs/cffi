@@ -28,6 +28,7 @@ impl<T> ToForeign<Vec<T>, *const [T]> for VecMarshaler<T> {
         log::debug!("Vec len: {}", vec.len());
         let raw = Box::into_raw(vec.into_boxed_slice());
         log::debug!("Raw len: {}", unsafe { (*raw).len() });
+        log::debug!("???: {}", super::vec_ref::VecRefMarshaler::from_foreign(raw).unwrap().len());
         Ok(raw)
     }
 }
