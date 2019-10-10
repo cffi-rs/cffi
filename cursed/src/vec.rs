@@ -14,18 +14,18 @@ impl<T> InputType for VecMarshaler<T> {
 }
 
 impl<T> ReturnType for VecMarshaler<T> {
-    type Foreign = *const c_void;
+    type Foreign = *const [T];
 
     fn foreign_default() -> Self::Foreign {
-        std::ptr::null()
+        unsafe { std::mem::transmute::<[usize; 2], *const [T]>([0, 0]) }
     }
 }
 
-impl<T> ToForeign<Vec<T>, *const c_void> for VecMarshaler<T> {
+impl<T> ToForeign<Vec<T>, *const [T]> for VecMarshaler<T> {
     type Error = Infallible;
 
-    fn to_foreign(vec: Vec<T>) -> Result<*const c_void, Self::Error> {
-        Ok(Box::into_raw(vec.into_boxed_slice()) as *const _)
+    fn to_foreign(vec: Vec<T>) -> Result<*const [T], Self::Error> {
+        Ok(Box::into_raw(vec.into_boxed_slice()))
     }
 }
 
