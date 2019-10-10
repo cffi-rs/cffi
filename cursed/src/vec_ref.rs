@@ -6,11 +6,12 @@ use std::sync::Arc;
 
 use super::null_ptr_error;
 use super::{FromForeign, InputType, ReturnType, ToForeign};
+use super::vec::Slice;
 
 pub struct VecRefMarshaler<T>(PhantomData<T>);
 
 impl<T> InputType for VecRefMarshaler<T> {
-    type Foreign = *const [T];
+    type Foreign = Slice<T>;
 }
 
 // impl<T> InputType for VecRefMarshaler<T>
@@ -25,13 +26,15 @@ impl<T> InputType for VecRefMarshaler<T> {
 // }
 
 impl<T> ReturnType for VecRefMarshaler<T> {
-    type Foreign = *const c_void;
+    type Foreign = Slice<T>;
 
     fn foreign_default() -> Self::Foreign {
-        std::ptr::null()
+        Slice {
+            data: std::ptr::null_mut(),
+            len: 0
+        }
     }
 }
-
 // impl<&'a T> ToForeign<&'a Vec<T>, *const c_void> for VecRefMarshaler<T> {
 //     type Error = Infallible;
 
@@ -40,18 +43,16 @@ impl<T> ReturnType for VecRefMarshaler<T> {
 //     }
 // }
 
-impl<'a, T> FromForeign<*const [T], &'a [T]> for VecRefMarshaler<T> {
+impl<'a, T> FromForeign<Slice<T>, &'a [T]> for VecRefMarshaler<T> {
     type Error = Box<dyn Error>;
 
-    fn from_foreign(ptr: *const [T]) -> Result<&'a [T], Self::Error> {
-        if ptr.is_null() {
+    fn from_foreign(slice: Slice<T>) -> Result<&'a [T], Self::Error> {
+        log::debug!("vec ref ptr: {:?}", slice);
+        if slice.data.is_null() {
             return Err(null_ptr_error());
         }
 
-        // let ptr = unsafe { std::mem::transmute::<*const c_void, *mut [T]>(ptr) };
-        // let boxed: Box<[T]> = unsafe { Box::from_raw(ptr as *mut _) };
-
-        // Ok(boxed.into_vec())
-        Ok(unsafe { &*ptr as _ })
+        let slice = unsafe { std::slice::from_raw_parts(slice.data, slice.len) };
+        Ok(slice)
     }
 }

@@ -3,43 +3,78 @@ use std::error::Error;
 use std::ffi::c_void;
 use std::marker::PhantomData;
 use std::sync::Arc;
+use std::fmt;
 
 use super::null_ptr_error;
 use super::{FromForeign, InputType, ReturnType, ToForeign};
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Slice<T> {
+    pub data: *mut T,
+    pub len: usize
+}
+
+impl<T> fmt::Debug for Slice<T> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.debug_struct(&format!("Slice<{}>", std::any::type_name::<T>()))
+            .field("data", &self.data.cast::<std::ffi::c_void>())
+            .field("len", &self.len)
+            .finish()
+    }
+}
+
 pub struct VecMarshaler<T>(PhantomData<T>);
 
 impl<T> InputType for VecMarshaler<T> {
-    type Foreign = *const [T];
+    type Foreign = Slice<T>;
 }
 
 impl<T> ReturnType for VecMarshaler<T> {
-    type Foreign = *const c_void;
+    type Foreign = Slice<T>;
 
     fn foreign_default() -> Self::Foreign {
-        std::ptr::null()
+        Slice {
+            data: std::ptr::null_mut(),
+            len: 0
+        }
     }
 }
 
-impl<T> ToForeign<Vec<T>, *const c_void> for VecMarshaler<T> {
+impl<T> ToForeign<Vec<T>, Slice<T>> for VecMarshaler<T> {
     type Error = Infallible;
 
-    fn to_foreign(vec: Vec<T>) -> Result<*const c_void, Self::Error> {
-        Ok(Box::into_raw(vec.into_boxed_slice()) as *const _)
+    fn to_foreign(mut vec: Vec<T>) -> Result<Slice<T>, Self::Error> {
+        vec.shrink_to_fit();
+        let len = vec.len();
+        let data = vec.as_mut_ptr();
+        std::mem::forget(vec);
+
+        // log::debug!("Vec len: {}", vec.len());
+        // let raw = Box::into_raw(vec.into_boxed_slice());
+        // log::debug!("Raw len: {}", unsafe { (*raw).len() });
+        // log::debug!("???: {}", super::vec_ref::VecRefMarshaler::from_foreign(raw).unwrap().len());
+
+        let raw = Slice {
+            data,
+            len
+        };
+        log::debug!("Ptr: {:?}", raw);
+        Ok(raw)
     }
 }
 
-impl<T> FromForeign<*const [T], Vec<T>> for VecMarshaler<T> {
+impl<T> FromForeign<Slice<T>, Vec<T>> for VecMarshaler<T> {
     type Error = Box<dyn Error>;
 
-    fn from_foreign(ptr: *const [T]) -> Result<Vec<T>, Self::Error> {
-        if ptr.is_null() {
+    fn from_foreign(ptr: Slice<T>) -> Result<Vec<T>, Self::Error> {
+        if ptr.data.is_null() {
             return Err(null_ptr_error());
         }
 
         // let ptr = unsafe { std::mem::transmute::<*const c_void, *mut [T]>(ptr) };
-        let boxed: Box<[T]> = unsafe { Box::from_raw(ptr as *mut _) };
+        let vec = unsafe { Vec::from_raw_parts(ptr.data, ptr.len, ptr.len) };
 
-        Ok(boxed.into_vec())
+        Ok(vec)
     }
 }
