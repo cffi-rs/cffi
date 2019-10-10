@@ -25,7 +25,10 @@ impl<T> ToForeign<Vec<T>, *const [T]> for VecMarshaler<T> {
     type Error = Infallible;
 
     fn to_foreign(vec: Vec<T>) -> Result<*const [T], Self::Error> {
-        Ok(Box::into_raw(vec.into_boxed_slice()))
+        log::debug!("Vec len: {}", vec.len());
+        let raw = Box::into_raw(vec.into_boxed_slice());
+        log::debug!("Raw len: {}", unsafe { (*raw).len() });
+        Ok(raw)
     }
 }
 
