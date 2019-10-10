@@ -51,6 +51,8 @@ impl<'a, T> FromForeign<*const [T], &'a [T]> for VecRefMarshaler<T> {
         // let boxed: Box<[T]> = unsafe { Box::from_raw(ptr as *mut _) };
 
         // Ok(boxed.into_vec())
-        Ok(unsafe { &*ptr })
+        let slice = unsafe { &*ptr };
+        log::debug!("Ref vec len: {}", slice.len());
+        Ok(slice)
     }
 }
