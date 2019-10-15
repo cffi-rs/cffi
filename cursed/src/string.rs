@@ -31,6 +31,18 @@ impl ToForeign<String, *const c_void> for StringMarshaler {
     }
 }
 
+impl<E> ToForeign<Result<String, E>, *const c_void> for StringMarshaler where E: std::error::Error + 'static {
+    type Error = Box<dyn Error>;
+
+    #[inline(always)]
+    fn to_foreign(result: Result<String, E>) -> Result<*const c_void, Self::Error> {
+        match result {
+            Ok(v) => StringMarshaler::to_foreign(v),
+            Err(e) => Err(Box::new(e))
+        }
+    }
+}
+
 impl<'a> FromForeign<*mut c_void, CString> for StringMarshaler {
     type Error = Box<dyn Error>;
 
