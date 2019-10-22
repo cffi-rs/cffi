@@ -1,9 +1,9 @@
 use std::convert::Infallible;
 use std::error::Error;
 use std::ffi::c_void;
+use std::fmt;
 use std::marker::PhantomData;
 use std::sync::Arc;
-use std::fmt;
 
 use super::null_ptr_error;
 use super::{FromForeign, InputType, ReturnType, ToForeign};
@@ -12,12 +12,19 @@ use super::{FromForeign, InputType, ReturnType, ToForeign};
 #[derive(Clone, Copy)]
 pub struct Slice<T> {
     pub data: *mut T,
-    pub len: usize
+    pub len: usize,
+}
+
+impl<T> std::default::Default for Slice<T> {
+    fn default() -> Self {
+        Slice { data: std::ptr::null_mut(), len: 0 }
+    }
 }
 
 impl<T> fmt::Debug for Slice<T> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.debug_struct(&format!("Slice<{}>", std::any::type_name::<T>()))
+        formatter
+            .debug_struct(&format!("Slice<{}>", std::any::type_name::<T>()))
             .field("data", &self.data.cast::<std::ffi::c_void>())
             .field("len", &self.len)
             .finish()
@@ -34,10 +41,7 @@ impl<T> ReturnType for VecMarshaler<T> {
     type Foreign = Slice<T>;
 
     fn foreign_default() -> Self::Foreign {
-        Slice {
-            data: std::ptr::null_mut(),
-            len: 0
-        }
+        Slice { data: std::ptr::null_mut(), len: 0 }
     }
 }
 
@@ -55,10 +59,7 @@ impl<T> ToForeign<Vec<T>, Slice<T>> for VecMarshaler<T> {
         // log::debug!("Raw len: {}", unsafe { (*raw).len() });
         // log::debug!("???: {}", super::vec_ref::VecRefMarshaler::from_foreign(raw).unwrap().len());
 
-        let raw = Slice {
-            data,
-            len
-        };
+        let raw = Slice { data, len };
         log::debug!("Ptr: {:?}", raw);
         Ok(raw)
     }

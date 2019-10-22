@@ -1,5 +1,4 @@
 use std::error::Error;
-use std::ffi::c_void;
 use std::marker::PhantomData;
 use std::mem::transmute;
 use std::sync::Arc;
@@ -10,15 +9,16 @@ use super::{FromForeign, InputType, ReturnType, ToForeign};
 pub struct BoxRefMarshaler<T>(PhantomData<T>);
 
 impl<T> InputType for BoxRefMarshaler<T> {
-    type Foreign = *const T;
+    type Foreign = *mut Box<T>;
 }
 
-impl<'a, T> FromForeign<*const c_void, &'a T> for BoxRefMarshaler<T> {
+impl<'a, T> FromForeign<*mut Box<T>, &'a Box<T>> for BoxRefMarshaler<T> {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn from_foreign(foreign: *const c_void) -> Result<&'a T, Self::Error> {
-        log::debug!("<BoxMarshaler<{ty}> as FromForeign<*const std::ffi::c_void, &'a T>>::from_foreign({:?})",
+    fn from_foreign(foreign: *mut Box<T>) -> Result<&'a Box<T>, Self::Error> {
+        log::debug!(
+            "<BoxMarshaler<{ty}> as FromForeign<*mut Box<T>, &'a Box<T>>>::from_foreign({:?})",
             foreign,
             ty = std::any::type_name::<T>()
         );
@@ -27,18 +27,17 @@ impl<'a, T> FromForeign<*const c_void, &'a T> for BoxRefMarshaler<T> {
             return Err(null_ptr_error());
         }
 
-        let ptr = unsafe { transmute::<*const c_void, *const T>(foreign) };
-
-        Ok(unsafe { &*ptr as &'a T })
+        Ok(unsafe { &*foreign as &'a Box<T> })
     }
 }
 
-impl<'a, T> FromForeign<*const c_void, &'a mut T> for BoxRefMarshaler<T> {
+impl<'a, T> FromForeign<*mut Box<T>, &'a mut Box<T>> for BoxRefMarshaler<T> {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn from_foreign(foreign: *const c_void) -> Result<&'a mut T, Self::Error> {
-        log::debug!("<BoxMarshaler<{ty}> as FromForeign<*const std::ffi::c_void, &'a mut T>>::from_foreign({:?})",
+    fn from_foreign(foreign: *mut Box<T>) -> Result<&'a mut Box<T>, Self::Error> {
+        log::debug!(
+            "<BoxMarshaler<{ty}> as FromForeign<*mut Box<T>, &'a mut Box<T>>>::from_foreign({:?})",
             foreign,
             ty = std::any::type_name::<T>()
         );
@@ -47,8 +46,6 @@ impl<'a, T> FromForeign<*const c_void, &'a mut T> for BoxRefMarshaler<T> {
             return Err(null_ptr_error());
         }
 
-        let ptr = unsafe { transmute::<*const c_void, *mut T>(foreign) };
-
-        Ok(unsafe { &mut *ptr as &'a mut T })
+        Ok(unsafe { &mut *foreign as &'a mut Box<T> })
     }
 }

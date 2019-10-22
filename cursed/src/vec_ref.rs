@@ -5,8 +5,8 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use super::null_ptr_error;
-use super::{FromForeign, InputType, ReturnType, ToForeign};
 use super::vec::Slice;
+use super::{FromForeign, InputType, ReturnType, ToForeign};
 
 pub struct VecRefMarshaler<T>(PhantomData<T>);
 
@@ -29,10 +29,7 @@ impl<T> ReturnType for VecRefMarshaler<T> {
     type Foreign = Slice<T>;
 
     fn foreign_default() -> Self::Foreign {
-        Slice {
-            data: std::ptr::null_mut(),
-            len: 0
-        }
+        Slice { data: std::ptr::null_mut(), len: 0 }
     }
 }
 // impl<&'a T> ToForeign<&'a Vec<T>, *const c_void> for VecRefMarshaler<T> {
