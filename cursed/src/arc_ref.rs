@@ -9,16 +9,16 @@ use super::{FromForeign, InputType, ReturnType, ToForeign};
 pub struct ArcRefMarshaler<T>(PhantomData<T>);
 
 impl<T> InputType for ArcRefMarshaler<T> {
-    type Foreign = *const Arc<T>;
+    type Foreign = *const T;
 }
 
-impl<'a, T> FromForeign<*const Arc<T>, &'a Arc<T>> for ArcRefMarshaler<T> {
+impl<'a, T> FromForeign<*const T, &'a Arc<T>> for ArcRefMarshaler<T> {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn from_foreign(foreign: *const Arc<T>) -> Result<&'a Arc<T>, Self::Error> {
+    fn from_foreign(foreign: *const T) -> Result<&'a Arc<T>, Self::Error> {
         log::debug!(
-            "<ArcMarshaler<{ty}> as FromForeign<*const Arc<T>, &'a Arc<T>>>::from_foreign({:?})",
+            "<ArcMarshaler<{ty}> as FromForeign<*const T, &'a Arc<T>>>::from_foreign({:?})",
             foreign,
             ty = std::any::type_name::<T>()
         );
@@ -27,9 +27,11 @@ impl<'a, T> FromForeign<*const Arc<T>, &'a Arc<T>> for ArcRefMarshaler<T> {
             return Err(null_ptr_error());
         }
 
-        // let ptr = unsafe { transmute::<*const T, *const T>(foreign) };
+        let arc = unsafe { Arc::from_raw(foreign) };
+        let ptr = &arc as *const _;
+        std::mem::forget(arc);
 
-        Ok(unsafe { &*foreign as &'a Arc<T> })
+        Ok(unsafe { &*ptr as &'a Arc<T> })
     }
 }
 
