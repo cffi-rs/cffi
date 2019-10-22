@@ -1,6 +1,5 @@
 use std::convert::Infallible;
 use std::error::Error;
-use std::ffi::c_void;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
@@ -53,50 +52,59 @@ use super::{FromForeign, InputType, ReturnType, ToForeign};
 ///     // Let the boxed item drop and it is freed. :)
 /// }
 /// ```
-pub struct BoxMarshaler<T>(PhantomData<T>);
+pub struct BoxMarshaler<T: ?Sized>(PhantomData<T>);
 
 impl<T> InputType for BoxMarshaler<T> {
     type Foreign = *const T;
 }
 
 impl<T> ReturnType for BoxMarshaler<T> {
-    type Foreign = *const std::ffi::c_void;
+    type Foreign = *const T;
 
     fn foreign_default() -> Self::Foreign {
         std::ptr::null()
     }
 }
 
-impl<T> ToForeign<T, *const c_void> for BoxMarshaler<T> {
+impl<T> ToForeign<Box<T>, *const T> for BoxMarshaler<T> {
     type Error = Infallible;
 
     #[inline(always)]
-    fn to_foreign(local: T) -> Result<*const c_void, Self::Error> {
+    fn to_foreign(local: Box<T>) -> Result<*const T, Self::Error> {
         log::debug!(
             "<BoxMarshaler<{ty}> as ToForeign<{ty}, {o}>>::to_foreign",
             ty = std::any::type_name::<T>(),
-            o = "*const c_void"
+            o = "*const T"
         );
-        Ok(Box::into_raw(Box::new(local)) as *const _ as *const _)
+        Ok(Box::into_raw(local) as *const _ as *const _)
     }
 }
 
-impl<T> ToForeign<T, *mut c_void> for BoxMarshaler<T> {
-    type Error = Infallible;
-
-    #[inline(always)]
-    fn to_foreign(local: T) -> Result<*mut c_void, Self::Error> {
-        Ok(Box::into_raw(Box::new(local)) as *mut _ as *mut _)
-    }
-}
-
-impl<T> FromForeign<*const std::ffi::c_void, T> for BoxMarshaler<T> {
+impl<T: ?Sized> ToForeign<Result<Box<T>, Box<dyn Error>>, *const T> for BoxMarshaler<T> {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn from_foreign(foreign: *const std::ffi::c_void) -> Result<T, Self::Error> {
+    fn to_foreign(local: Result<Box<T>, Box<dyn Error>>) -> Result<*const T, Self::Error> {
+        local.and_then(|x| Ok(Box::into_raw(x) as *const _ as *const _))
+    }
+}
+
+// impl<T> ToForeign<Box<T>, *mut T> for BoxMarshaler<T> {
+//     type Error = Infallible;
+
+//     #[inline(always)]
+//     fn to_foreign(local: Box<T>) -> Result<*mut T, Self::Error> {
+//         Ok(Box::into_raw(local as *mut _ as *mut _)
+//     }
+// }
+
+impl<T> FromForeign<*const T, Box<T>> for BoxMarshaler<T> {
+    type Error = Box<dyn Error>;
+
+    #[inline(always)]
+    fn from_foreign(foreign: *const T) -> Result<Box<T>, Self::Error> {
         log::debug!(
-            "<BoxMarshaler<{ty}> as FromForeign<*const std::ffi::c_void, T>>::from_foreign({:?})",
+            "<BoxMarshaler<{ty}> as FromForeign<*const T, T>>::from_foreign({:?})",
             foreign,
             ty = std::any::type_name::<T>()
         );
@@ -105,7 +113,7 @@ impl<T> FromForeign<*const std::ffi::c_void, T> for BoxMarshaler<T> {
             return Err(null_ptr_error());
         }
 
-        Ok(*unsafe { Box::from_raw(foreign as *mut _) })
+        Ok(unsafe { Box::from_raw(foreign as *mut _) })
     }
 }
 

@@ -7,10 +7,15 @@ use std::{
     sync::Arc,
 };
 
+// Re-export for certain classes of crime
+pub use ctor::ctor;
+
 mod arc;
+mod arc_ref;
 mod bool;
 mod box_ref;
 mod boxed;
+mod copy;
 mod path;
 mod str;
 mod string;
@@ -22,12 +27,14 @@ pub use self::bool::BoolMarshaler;
 pub use self::path::PathMarshaler;
 pub use self::str::StrMarshaler;
 pub use self::vec::VecMarshaler;
-pub use self::vec_ref::VecRefMarshaler;
 pub use arc::ArcMarshaler;
+pub use arc_ref::ArcRefMarshaler;
 pub use box_ref::BoxRefMarshaler;
 pub use boxed::BoxMarshaler;
+pub use copy::CopyMarshaler;
 pub use string::StringMarshaler;
 pub use unit::UnitMarshaler;
+pub use vec_ref::VecRefMarshaler;
 
 pub type ErrCallback = Option<extern "C" fn(*const c_void)>;
 pub type RetCallback<T> = Option<extern "C" fn(T)>;

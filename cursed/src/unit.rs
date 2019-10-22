@@ -14,3 +14,12 @@ impl ReturnType for UnitMarshaler {
         ()
     }
 }
+
+impl<E> ToForeign<Result<(), E>, ()> for UnitMarshaler {
+    type Error = E;
+
+    #[inline(always)]
+    fn to_foreign(local: Result<(), E>) -> Result<(), Self::Error> {
+        local
+    }
+}
