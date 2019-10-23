@@ -63,7 +63,7 @@ pub trait FromForeign<Foreign, Local>: Sized {
 }
 
 #[inline(always)]
-fn null_ptr_error() -> Box<io::Error> {
+pub fn null_ptr_error() -> Box<io::Error> {
     Box::new(io::Error::new(io::ErrorKind::InvalidData, "null pointer"))
 }
 

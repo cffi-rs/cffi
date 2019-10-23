@@ -29,9 +29,14 @@ impl<'a, T> FromForeign<*const T, &'a Arc<T>> for ArcRefMarshaler<T> {
 
         let arc = unsafe { Arc::from_raw(foreign) };
         let ptr = &arc as *const _;
+        let ptr = unsafe { &*ptr as &'a Arc<T> };
+
+        // FIXME: This is a load-bearing formatter. If it doesn't exist,
+        // we get segfaults. We have no idea why.
+        let _x = format!("{:?}", ptr as *const _);
         std::mem::forget(arc);
 
-        Ok(unsafe { &*ptr as &'a Arc<T> })
+        Ok(ptr)
     }
 }
 
