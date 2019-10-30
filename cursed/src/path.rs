@@ -1,6 +1,7 @@
 use std::convert::Infallible;
 use std::ffi::CStr;
 use std::path::{Path, PathBuf};
+use std::error::Error;
 
 #[cfg(unix)]
 use libc::c_char;
@@ -44,11 +45,13 @@ impl ReturnType for PathMarshaler {
 }
 
 #[cfg(windows)]
-impl<'a> FromForeign<*const wchar_t, &'a Path> for PathMarshaler {
+impl<'a> FromForeign<*const wchar_t, PathBuf> for PathMarshaler {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
     fn from_foreign(c_wstr: *const wchar_t) -> Result<PathBuf, Self::Error> {
+        use std::os::windows::ffi::OsStringExt;
+
         let len = unsafe { libc::wcslen(c_wstr) };
         let slice: &[u16] = unsafe { std::slice::from_raw_parts(c_wstr, len) };
         let osstr = std::ffi::OsString::from_wide(slice);
@@ -62,6 +65,8 @@ impl ToForeign<PathBuf, *const wchar_t> for PathMarshaler {
 
     #[inline(always)]
     fn to_foreign(input: PathBuf) -> Result<*const wchar_t, Self::Error> {
+        use std::os::windows::ffi::OsStrExt;
+
         let mut vec: Vec<wchar_t> =
             input.into_os_string().encode_wide().chain(Some(0).into_iter()).collect();
         vec.shrink_to_fit();
@@ -73,7 +78,7 @@ impl ToForeign<PathBuf, *const wchar_t> for PathMarshaler {
 
 #[cfg(unix)]
 impl<'a> FromForeign<*const c_char, &'a Path> for PathMarshaler {
-    type Error = Box<std::io::Error>;
+    type Error = Box<dyn Error>;
 
     #[inline(always)]
     fn from_foreign(foreign: *const c_char) -> Result<&'a Path, Self::Error> {
@@ -103,6 +108,7 @@ impl ToForeign<PathBuf, Slice<u8>> for PathMarshaler {
     }
 }
 
+#[cfg(unix)]
 impl<E> ToForeign<Result<PathBuf, E>, Slice<u8>> for PathMarshaler {
     type Error = E;
 
