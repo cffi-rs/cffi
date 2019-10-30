@@ -56,6 +56,17 @@ impl ForeignTypeExt for syn::Type {
     fn to_foreign_type(&self) -> Result<syn::Type, syn::Error> {
         match &self {
             syn::Type::Path(..) | syn::Type::Reference(..) => {}
+            syn::Type::BareFn(bare_fn) => {
+                if bare_fn.abi.is_some() {
+                    // This one is safe to pass through.
+                    return Ok(self.clone());
+                }
+
+                return Err(syn::Error::new_spanned(
+                    self,
+                    "Non-extern-C fn parameters not supported",
+                ));
+            }
             syn::Type::Tuple(..) => {
                 return Err(syn::Error::new_spanned(self, "Tuple parameters not supported"))
             }
