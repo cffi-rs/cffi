@@ -26,7 +26,7 @@ impl<'a, T> FromForeign<*const T, Arc<T>> for ArcRefMarshaler<T> {
 
         let arc = unsafe { Arc::from_raw(foreign) };
         let cloned = Arc::clone(&arc);
-        std::mem::forget(arc);
+        let _x = Arc::into_raw(arc);
 
         Ok(cloned)
     }

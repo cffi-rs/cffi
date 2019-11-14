@@ -81,3 +81,11 @@ pub fn null_ptr_error() -> Box<io::Error> {
 //         }
 //     }
 // }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test() {
+
+    }
+}
