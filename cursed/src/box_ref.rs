@@ -31,11 +31,11 @@ impl<T> InputType for BoxRefMarshaler<T> {
 //     }
 // }
 
-impl<'a, T> FromForeign<*mut T, &'a Box<T>> for BoxRefMarshaler<T> {
+impl<'a, T> FromForeign<*mut T, &'a T> for BoxRefMarshaler<T> {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn from_foreign(foreign: *mut T) -> Result<&'a Box<T>, Self::Error> {
+    fn from_foreign(foreign: *mut T) -> Result<&'a T, Self::Error> {
         log::debug!(
             "<BoxMarshaler<{ty}> as FromForeign<*mut Box<T>, &'a mut Box<T>>>::from_foreign({:?})",
             foreign,
@@ -46,11 +46,11 @@ impl<'a, T> FromForeign<*mut T, &'a Box<T>> for BoxRefMarshaler<T> {
             return Err(null_ptr_error());
         }
 
-        let mut boxed = unsafe { Box::from_raw(foreign as *mut _ as *mut _) };
-        let ptr = &mut boxed as *mut _;
-        std::mem::forget(boxed);
-        // let ptr = unsafe { std::mem::transmute::<*mut T, *mut Box<T>>(foreign) };
+        // let mut boxed = unsafe { Box::from_raw(foreign as *mut _ as *mut _) };
+        // let ptr = &mut boxed as *mut _;
+        // std::mem::forget(boxed);
+        // // let ptr = unsafe { std::mem::transmute::<*mut T, *mut Box<T>>(foreign) };
 
-        Ok(unsafe { &*ptr })
+        Ok(unsafe { &*foreign })
     }
 }

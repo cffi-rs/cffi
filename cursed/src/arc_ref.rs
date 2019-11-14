@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::marker::PhantomData;
 use std::mem::transmute;
+use std::mem::ManuallyDrop;
 use std::sync::Arc;
 
 use super::null_ptr_error;
@@ -12,31 +13,22 @@ impl<T> InputType for ArcRefMarshaler<T> {
     type Foreign = *const T;
 }
 
-impl<'a, T> FromForeign<*const T, &'a Arc<T>> for ArcRefMarshaler<T> {
+impl<'a, T> FromForeign<*const T, Arc<T>> for ArcRefMarshaler<T> {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn from_foreign(foreign: *const T) -> Result<&'a Arc<T>, Self::Error> {
-        log::debug!(
-            "<ArcMarshaler<{ty}> as FromForeign<*const T, &'a Arc<T>>>::from_foreign({:?})",
-            foreign,
-            ty = std::any::type_name::<T>()
-        );
-
+    fn from_foreign(foreign: *const T) -> Result<Arc<T>, Self::Error> {
         if foreign.is_null() {
             return Err(null_ptr_error());
         }
 
-        let arc = unsafe { Arc::from_raw(foreign) };
-        let ptr = &arc as *const _;
-        let ptr = unsafe { &*ptr as &'a Arc<T> };
+        // let ptr = foreign as &'a Arc<T>;
 
-        // FIXME: This is a load-bearing formatter. If it doesn't exist,
-        // we get segfaults. We have no idea why.
-        let _x = format!("{:?}", ptr as *const _);
+        let arc = unsafe { Arc::from_raw(foreign) };
+        let cloned = Arc::clone(&arc);
         std::mem::forget(arc);
 
-        Ok(ptr)
+        Ok(cloned)
     }
 }
 
@@ -51,7 +43,7 @@ impl<'a, T> FromForeign<*const T, &'a Arc<T>> for ArcRefMarshaler<T> {
 //             ty = std::any::type_name::<T>()
 //         );
 
-//         if foreign.is_null() {
+//         if foreign.is_null_mut() {
 //             return Err(null_ptr_error());
 //         }
 
