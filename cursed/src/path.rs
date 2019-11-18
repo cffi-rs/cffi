@@ -77,11 +77,11 @@ impl ToForeign<PathBuf, *const wchar_t> for PathMarshaler {
 }
 
 #[cfg(unix)]
-impl<'a> FromForeign<*const c_char, &'a Path> for PathMarshaler {
+impl FromForeign<*const c_char, PathBuf> for PathMarshaler {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn from_foreign(foreign: *const c_char) -> Result<&'a Path, Self::Error> {
+    fn from_foreign(foreign: *const c_char) -> Result<PathBuf, Self::Error> {
         use std::ffi::OsStr;
         use std::os::unix::ffi::OsStrExt;
 
@@ -91,7 +91,7 @@ impl<'a> FromForeign<*const c_char, &'a Path> for PathMarshaler {
 
         let c_str = unsafe { CStr::from_ptr(foreign.cast()) };
         let os_str = OsStr::from_bytes(c_str.to_bytes());
-        Ok(Path::new(os_str))
+        Ok(Path::new(os_str).to_path_buf())
     }
 }
 
@@ -105,6 +105,16 @@ impl ToForeign<PathBuf, Slice<u8>> for PathMarshaler {
 
         let vec = input.into_os_string().into_vec();
         VecMarshaler::to_foreign(vec)
+    }
+}
+
+#[cfg(windows)]
+impl<E> ToForeign<Result<PathBuf, E>, *const wchar_t> for PathMarshaler {
+    type Error = E;
+
+    #[inline(always)]
+    fn to_foreign(input: Result<PathBuf, E>) -> Result<*const wchar_t, Self::Error> {
+        input.and_then(|x| Ok(PathMarshaler::to_foreign(x).unwrap()))
     }
 }
 

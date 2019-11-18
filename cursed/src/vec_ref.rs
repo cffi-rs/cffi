@@ -1,12 +1,9 @@
-use std::convert::Infallible;
 use std::error::Error;
-use std::ffi::c_void;
 use std::marker::PhantomData;
-use std::sync::Arc;
 
 use super::null_ptr_error;
 use super::vec::Slice;
-use super::{FromForeign, InputType, ReturnType, ToForeign};
+use super::{FromForeign, InputType, ReturnType};
 
 pub struct VecRefMarshaler<T>(PhantomData<T>);
 
