@@ -19,3 +19,7 @@ libc = "0.2.65"
 log = "0.4.8"
 env_logger = "0.7.1"
 ctor = "0.1.12"
+url = { version = "2.1.0", optional = true }
+
+[features]
+default = ["url"]

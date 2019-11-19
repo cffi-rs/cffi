@@ -10,6 +10,9 @@ use std::{
 // Re-export for certain classes of crime
 pub use ctor::ctor;
 
+#[cfg(feature = "url")]
+mod url;
+
 mod arc;
 mod arc_ref;
 mod bool;
@@ -22,6 +25,9 @@ mod string;
 mod unit;
 mod vec;
 mod vec_ref;
+
+#[cfg(feature = "url")]
+pub use self::url::UrlMarshaler;
 
 pub use self::bool::BoolMarshaler;
 pub use self::path::PathMarshaler;
