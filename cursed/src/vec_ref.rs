@@ -2,8 +2,7 @@ use std::error::Error;
 use std::marker::PhantomData;
 
 use super::null_ptr_error;
-use super::vec::Slice;
-use super::{FromForeign, InputType, ReturnType};
+use super::{FromForeign, InputType, ReturnType, Slice};
 
 pub struct VecRefMarshaler<T>(PhantomData<T>);
 

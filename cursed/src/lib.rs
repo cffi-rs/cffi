@@ -88,6 +88,29 @@ pub fn null_ptr_error() -> Box<io::Error> {
 //     }
 // }
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Slice<T> {
+    pub data: *mut T,
+    pub len: usize,
+}
+
+impl<T> std::default::Default for Slice<T> {
+    fn default() -> Self {
+        Slice { data: std::ptr::null_mut(), len: 0 }
+    }
+}
+
+impl<T> std::fmt::Debug for Slice<T> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter
+            .debug_struct(&format!("Slice<{}>", std::any::type_name::<T>()))
+            .field("data", &self.data.cast::<std::ffi::c_void>())
+            .field("len", &self.len)
+            .finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

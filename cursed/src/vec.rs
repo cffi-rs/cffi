@@ -5,31 +5,7 @@ use std::fmt;
 use std::marker::PhantomData;
 
 use super::null_ptr_error;
-use super::{FromForeign, InputType, ReturnType, ToForeign};
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct Slice<T> {
-    pub data: *mut T,
-    pub len: usize,
-}
-
-impl<T> std::default::Default for Slice<T> {
-    fn default() -> Self {
-        Slice { data: std::ptr::null_mut(), len: 0 }
-    }
-}
-
-impl<T> fmt::Debug for Slice<T> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter
-            .debug_struct(&format!("Slice<{}>", std::any::type_name::<T>()))
-            .field("data", &self.data.cast::<std::ffi::c_void>())
-            .field("len", &self.len)
-            .finish()
-    }
-}
-
+use super::{FromForeign, InputType, ReturnType, ToForeign, Slice};
 pub struct VecMarshaler<T>(PhantomData<T>);
 
 impl<T> InputType for VecMarshaler<T> {

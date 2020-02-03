@@ -9,8 +9,8 @@ use libc::c_char;
 use libc::wchar_t;
 
 use super::null_ptr_error;
-use super::vec::{Slice, VecMarshaler};
-use super::{FromForeign, InputType, ReturnType, ToForeign};
+use super::vec::VecMarshaler;
+use super::{FromForeign, InputType, ReturnType, ToForeign, Slice};
 
 pub struct PathMarshaler;
 
