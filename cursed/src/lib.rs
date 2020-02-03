@@ -89,8 +89,7 @@ pub fn null_ptr_error() -> Box<io::Error> {
 // }
 
 #[repr(C)]
-#[derive(Clone, Copy)]
-pub struct Slice<T> {
+pub struct Slice<T: ?Sized> {
     pub data: *mut T,
     pub len: usize,
 }
@@ -108,6 +107,22 @@ impl<T> std::fmt::Debug for Slice<T> {
             .field("data", &self.data.cast::<std::ffi::c_void>())
             .field("len", &self.len)
             .finish()
+    }
+}
+
+impl<T> Slice<T> {
+    pub unsafe fn from_box(boxed: Box<[T]>) -> Slice<T> {
+        std::mem::transmute(boxed)
+    }
+
+    pub unsafe fn into_box(self) -> Box<[T]> {
+        std::mem::transmute(self)
+    }
+}
+
+impl<T> AsRef<[T]> for Slice<T> {
+    fn as_ref(&self) -> &[T] {
+        unsafe { std::slice::from_raw_parts(self.data as _, self.len) }
     }
 }
 

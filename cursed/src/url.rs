@@ -7,7 +7,7 @@ use libc::c_char;
 use url::Url;
 
 use super::null_ptr_error;
-use super::{FromForeign, InputType, ReturnType, ToForeign};
+use super::{FromForeign, InputType, ReturnType, ToForeign, Slice};
 
 pub struct UrlMarshaler;
 
@@ -56,11 +56,11 @@ impl ToForeign<Option<Url>, *const c_char> for UrlMarshaler {
 }
 
 // char pointer -> URL
-impl<'a> FromForeign<*const c_char, Url> for UrlMarshaler {
+impl<'a> FromForeign<Slice<u8>, Url> for UrlMarshaler {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn from_foreign(key: *const c_char) -> Result<Url, Self::Error> {
+    fn from_foreign(key: Slice<u8>) -> Result<Url, Self::Error> {
         let s = crate::StrMarshaler::from_foreign(key)?;
         Url::parse(s).map_err(|e| Box::new(e) as _)
     }
