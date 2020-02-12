@@ -48,7 +48,7 @@ fn gen_foreign(
     has_callback: bool,
 ) -> TokenStream {
     let block = gen_try_not_null(
-        quote! { #marshaler::from_foreign(#name) },
+        quote! { unsafe { #marshaler::from_foreign(#name) } },
         ret_ty.filter(|_| !has_callback).map(|ty| {
             if crate::is_passthrough_type(ty) {
                 quote! { <#ty>::default() }
