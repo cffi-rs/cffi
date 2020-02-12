@@ -40,13 +40,13 @@ impl<'a> FromForeign<Slice<u8>, &'a str> for StrMarshaler<'a> {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn from_foreign(slice: Slice<u8>) -> Result<&'a str, Self::Error> {
+    unsafe fn from_foreign(slice: Slice<u8>) -> Result<&'a str, Self::Error> {
         if slice.data.is_null() {
             return Err(null_ptr_error());
         }
         
-        let r = unsafe { std::slice::from_raw_parts(slice.data as _, slice.len) };
-        unsafe { std::str::from_utf8(r) }.map_err(|e| Box::new(e) as _)
+        let r = std::slice::from_raw_parts(slice.data as _, slice.len);
+        std::str::from_utf8(r).map_err(|e| Box::new(e) as _)
     }
 }
 
@@ -54,12 +54,12 @@ impl<'a> FromForeign<Slice<u8>, Option<&'a str>> for StrMarshaler<'a> {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn from_foreign(slice: Slice<u8>) -> Result<Option<&'a str>, Self::Error> {
+    unsafe fn from_foreign(slice: Slice<u8>) -> Result<Option<&'a str>, Self::Error> {
         if slice.data.is_null() {
             return Ok(None);
         }
         
-        let r = unsafe { std::slice::from_raw_parts(slice.data as _, slice.len) };
+        let r = std::slice::from_raw_parts(slice.data as _, slice.len);
         std::str::from_utf8(r)
             .map(Some)
             .map_err(|e| Box::new(e) as _)

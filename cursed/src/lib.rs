@@ -65,7 +65,7 @@ pub trait ToForeign<Local, Foreign>: Sized {
 
 pub trait FromForeign<Foreign, Local>: Sized {
     type Error;
-    fn from_foreign(_: Foreign) -> Result<Local, Self::Error>;
+    unsafe fn from_foreign(_: Foreign) -> Result<Local, Self::Error>;
 }
 
 #[inline(always)]

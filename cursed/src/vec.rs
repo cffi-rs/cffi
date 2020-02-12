@@ -43,13 +43,13 @@ impl<T> ToForeign<Vec<T>, Slice<T>> for VecMarshaler<T> {
 impl<T> FromForeign<Slice<T>, Vec<T>> for VecMarshaler<T> {
     type Error = Box<dyn Error>;
 
-    fn from_foreign(ptr: Slice<T>) -> Result<Vec<T>, Self::Error> {
+    unsafe fn from_foreign(ptr: Slice<T>) -> Result<Vec<T>, Self::Error> {
         if ptr.data.is_null() {
             return Err(null_ptr_error());
         }
 
         // let ptr = unsafe { std::mem::transmute::<*const c_void, *mut [T]>(ptr) };
-        let vec = unsafe { Vec::from_raw_parts(ptr.data, ptr.len, ptr.len) };
+        let vec = Vec::from_raw_parts(ptr.data, ptr.len, ptr.len);
 
         Ok(vec)
     }

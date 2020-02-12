@@ -53,18 +53,18 @@ impl ToForeign<Option<String>, Slice<u8>> for StringMarshaler {
     }
 }
 
+impl<'a> FromForeign<Slice<u8>, String> for StringMarshaler {
+    type Error = Box<dyn Error>;
 
-// impl<'a> FromForeign<Slice<u8>, String> for StringMarshaler {
-//     type Error = Box<dyn Error>;
+    #[inline(always)]
+    unsafe fn from_foreign(key: Slice<u8>) -> Result<String, Self::Error> {
+        VecMarshaler::from_foreign(key)
+            .and_then(|vec| String::from_utf8(vec).map_err(|err| Box::new(err) as _))
+    }
+}
 
-//     #[inline(always)]
-//     fn from_foreign(key: Slice<u8>) -> Result<String, Self::Error> {
-//         if slice.data.is_null() {
-//             return Err(null_ptr_error());
-//         }
+#[no_mangle]
+pub unsafe extern "C" fn cursed_string_free(slice: Slice<u8>) {
+    crate::vec::cursed_vec_free(slice.cast());
+}
 
-//         let boxed: Box<[u8]> = unsafe { key.into_box() };
-//         let s = unsafe { std::str::from_boxed_utf8_unchecked(boxed) };
-//         Ok(s)
-//     }
-// }

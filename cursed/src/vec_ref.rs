@@ -39,13 +39,13 @@ impl<T> ReturnType for VecRefMarshaler<T> {
 impl<'a, T> FromForeign<Slice<T>, &'a [T]> for VecRefMarshaler<T> {
     type Error = Box<dyn Error>;
 
-    fn from_foreign(slice: Slice<T>) -> Result<&'a [T], Self::Error> {
+    unsafe fn from_foreign(slice: Slice<T>) -> Result<&'a [T], Self::Error> {
         log::debug!("vec ref ptr: {:?}", slice);
         if slice.data.is_null() {
             return Err(null_ptr_error());
         }
 
-        let slice = unsafe { std::slice::from_raw_parts(slice.data, slice.len) };
+        let slice = std::slice::from_raw_parts(slice.data, slice.len);
         Ok(slice)
     }
 }

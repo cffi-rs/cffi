@@ -19,7 +19,7 @@ impl FromForeign<u8, bool> for BoolMarshaler {
     type Error = Infallible;
 
     #[inline(always)]
-    fn from_foreign(i: u8) -> Result<bool, Self::Error> {
+    unsafe fn from_foreign(i: u8) -> Result<bool, Self::Error> {
         Ok(i != 0)
     }
 }

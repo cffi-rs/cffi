@@ -46,7 +46,7 @@ impl<T> FromForeign<*const T, Arc<T>> for ArcMarshaler<T> {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn from_foreign(foreign: *const T) -> Result<Arc<T>, Self::Error> {
+    unsafe fn from_foreign(foreign: *const T) -> Result<Arc<T>, Self::Error> {
         log::debug!(
             "<ArcMarshaler<{ty}> as FromForeign<*const std::ffi::c_void, T>>::from_foreign({:?})",
             foreign,
@@ -57,7 +57,7 @@ impl<T> FromForeign<*const T, Arc<T>> for ArcMarshaler<T> {
             return Err(null_ptr_error());
         }
 
-        Ok(unsafe { Arc::from_raw(foreign as *const _) })
+        Ok(Arc::from_raw(foreign as *const _))
     }
 }
 

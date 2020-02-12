@@ -19,7 +19,7 @@ impl<T: Copy> FromForeign<T, T> for CopyMarshaler<T> {
     type Error = Infallible;
 
     #[inline(always)]
-    fn from_foreign(x: T) -> Result<T, Self::Error> {
+    unsafe fn from_foreign(x: T) -> Result<T, Self::Error> {
         Ok(x)
     }
 }

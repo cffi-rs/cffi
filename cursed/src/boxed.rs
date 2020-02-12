@@ -102,7 +102,7 @@ impl<T> FromForeign<*const T, Box<T>> for BoxMarshaler<T> {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn from_foreign(foreign: *const T) -> Result<Box<T>, Self::Error> {
+    unsafe fn from_foreign(foreign: *const T) -> Result<Box<T>, Self::Error> {
         log::debug!(
             "<BoxMarshaler<{ty}> as FromForeign<*const T, T>>::from_foreign({:?})",
             foreign,
@@ -113,7 +113,7 @@ impl<T> FromForeign<*const T, Box<T>> for BoxMarshaler<T> {
             return Err(null_ptr_error());
         }
 
-        Ok(unsafe { Box::from_raw(foreign as *mut _) })
+        Ok(Box::from_raw(foreign as *mut _))
     }
 }
 
@@ -121,7 +121,7 @@ impl<T> FromForeign<*const T, Box<T>> for BoxMarshaler<T> {
 //     type Error = Box<dyn Error>;
 
 //     #[inline(always)]
-//     fn from_foreign(foreign: *mut T) -> Result<Box<T>, Self::Error> {
+//     unsafe fn from_foreign(foreign: *mut T) -> Result<Box<T>, Self::Error> {
 //         log::debug!("<BoxMarshaler<{ty}> as FromForeign<*mut {ty}, &'a {ty}>>::from_foreign({:?})",
 //             foreign,
 //             ty = std::any::type_name::<T>()
@@ -165,7 +165,7 @@ impl<T> FromForeign<*const T, Box<T>> for BoxMarshaler<T> {
 //     type Error = Box<dyn Error>;
 
 //     #[inline(always)]
-//     fn from_foreign(foreign: *mut T) -> Result<&'a mut T, Self::Error> {
+//     unsafe fn from_foreign(foreign: *mut T) -> Result<&'a mut T, Self::Error> {
 //         if foreign.is_null() {
 //             return Err(null_ptr_error());
 //         }

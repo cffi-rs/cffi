@@ -17,14 +17,12 @@ impl<'a, T> FromForeign<*const T, Arc<T>> for ArcRefMarshaler<T> {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn from_foreign(foreign: *const T) -> Result<Arc<T>, Self::Error> {
+    unsafe fn from_foreign(foreign: *const T) -> Result<Arc<T>, Self::Error> {
         if foreign.is_null() {
             return Err(null_ptr_error());
         }
 
-        // let ptr = foreign as &'a Arc<T>;
-
-        let arc = unsafe { Arc::from_raw(foreign) };
+        let arc = Arc::from_raw(foreign);
         let cloned = Arc::clone(&arc);
         let _x = Arc::into_raw(arc);
 
@@ -36,7 +34,7 @@ impl<'a, T> FromForeign<*const T, Arc<T>> for ArcRefMarshaler<T> {
 //     type Error = Box<dyn Error>;
 
 //     #[inline(always)]
-//     fn from_foreign(foreign: *const T) -> Result<&'a mut T, Self::Error> {
+//     unsafe fn from_foreign(foreign: *const T) -> Result<&'a mut T, Self::Error> {
 //         log::debug!(
 //             "<ArcMarshaler<{ty}> as FromForeign<*const T, &'a mut T>>::from_foreign({:?})",
 //             foreign,

@@ -60,7 +60,7 @@ impl<'a> FromForeign<Slice<u8>, Url> for UrlMarshaler {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
-    fn from_foreign(key: Slice<u8>) -> Result<Url, Self::Error> {
+    unsafe fn from_foreign(key: Slice<u8>) -> Result<Url, Self::Error> {
         let s = crate::StrMarshaler::from_foreign(key)?;
         Url::parse(s).map_err(|e| Box::new(e) as _)
     }
