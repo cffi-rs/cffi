@@ -38,7 +38,7 @@ pub use string::StringMarshaler;
 pub use unit::UnitMarshaler;
 pub use vec_ref::VecRefMarshaler;
 
-pub type ErrCallback = Option<extern "C" fn(*const c_void)>;
+pub type ErrCallback = Option<extern "C" fn(*const c_void, usize)>;
 pub type RetCallback<T> = Option<extern "C" fn(T)>;
 
 pub trait ReturnType {
@@ -90,6 +90,12 @@ pub struct Slice<T: ?Sized> {
     pub len: usize,
 }
 
+impl<T> Slice<T> {
+    unsafe fn cast<U>(self) -> Slice<U> {
+        std::mem::transmute::<Slice<T>, Slice<U>>(self)
+    }
+}
+
 impl<T> std::default::Default for Slice<T> {
     fn default() -> Self {
         Slice { data: std::ptr::null_mut(), len: 0 }
@@ -103,16 +109,6 @@ impl<T> std::fmt::Debug for Slice<T> {
             .field("data", &self.data.cast::<std::ffi::c_void>())
             .field("len", &self.len)
             .finish()
-    }
-}
-
-impl<T> Slice<T> {
-    pub unsafe fn from_box(boxed: Box<[T]>) -> Slice<T> {
-        std::mem::transmute(boxed)
-    }
-
-    pub unsafe fn into_box(self) -> Box<[T]> {
-        std::mem::transmute(self)
     }
 }
 
