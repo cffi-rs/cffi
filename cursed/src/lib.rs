@@ -15,7 +15,7 @@ mod bool;
 mod box_ref;
 mod boxed;
 mod copy;
-mod path;
+mod pathbuf;
 mod str;
 mod string;
 mod unit;
@@ -26,7 +26,7 @@ mod vec_ref;
 pub use self::url::UrlMarshaler;
 
 pub use self::bool::BoolMarshaler;
-pub use self::path::PathMarshaler;
+pub use self::pathbuf::PathBufMarshaler;
 pub use self::str::StrMarshaler;
 pub use self::vec::VecMarshaler;
 pub use arc::ArcMarshaler;
