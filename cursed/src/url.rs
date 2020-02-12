@@ -1,12 +1,9 @@
 use std::error::Error;
 use std::ffi::CString;
-use std::marker::PhantomData;
-use std::sync::Arc;
 
 use libc::c_char;
 use url::Url;
 
-use super::null_ptr_error;
 use super::{FromForeign, InputType, ReturnType, ToForeign, Slice};
 
 pub struct UrlMarshaler;
@@ -41,7 +38,7 @@ impl ToForeign<Result<Url, Box<dyn Error>>, *const c_char> for UrlMarshaler {
 
     #[inline(always)]
     fn to_foreign(result: Result<Url, Box<dyn Error>>) -> Result<*const c_char, Self::Error> {
-        result.and_then(|v| UrlMarshaler::to_foreign(v))
+        result.and_then(UrlMarshaler::to_foreign)
     }
 }
 
@@ -51,7 +48,7 @@ impl ToForeign<Option<Url>, *const c_char> for UrlMarshaler {
 
     #[inline(always)]
     fn to_foreign(option: Option<Url>) -> Result<*const c_char, Self::Error> {
-        option.map_or_else(|| Ok(std::ptr::null()), |v| UrlMarshaler::to_foreign(v))
+        option.map_or_else(|| Ok(std::ptr::null()), UrlMarshaler::to_foreign)
     }
 }
 

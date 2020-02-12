@@ -1,10 +1,6 @@
 use std::{
-    convert::Infallible,
-    error::Error,
-    ffi::{c_void, CStr, CString},
+    ffi::c_void,
     io,
-    marker::PhantomData,
-    sync::Arc,
 };
 
 // Re-export for certain classes of crime

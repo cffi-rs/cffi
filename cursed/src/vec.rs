@@ -1,7 +1,5 @@
 use std::convert::Infallible;
 use std::error::Error;
-use std::ffi::c_void;
-use std::fmt;
 use std::marker::PhantomData;
 
 use super::null_ptr_error;

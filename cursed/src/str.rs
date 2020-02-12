@@ -1,7 +1,5 @@
 use std::error::Error;
-use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
-use std::sync::Arc;
 
 use super::null_ptr_error;
 use super::{FromForeign, InputType, ReturnType, ToForeign, Slice};

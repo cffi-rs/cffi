@@ -1,4 +1,4 @@
-use super::{FromForeign, InputType, ReturnType, ToForeign};
+use super::{InputType, ReturnType, ToForeign};
 
 pub struct UnitMarshaler;
 

@@ -1,10 +1,8 @@
 use std::error::Error;
 use std::marker::PhantomData;
-use std::mem::transmute;
-use std::sync::Arc;
 
 use super::null_ptr_error;
-use super::{FromForeign, InputType, ReturnType, ToForeign};
+use super::{FromForeign, InputType};
 
 pub struct BoxRefMarshaler<T>(PhantomData<T>);
 

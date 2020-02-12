@@ -1,12 +1,7 @@
 use std::error::Error;
-use std::ffi::CString;
-use std::marker::PhantomData;
-use std::sync::Arc;
 use std::convert::Infallible;
 
-use super::null_ptr_error;
 use super::{FromForeign, InputType, ReturnType, ToForeign, Slice, vec::VecMarshaler};
-use libc::c_char;
 
 pub struct StringMarshaler;
 

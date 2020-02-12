@@ -1,6 +1,5 @@
 use std::convert::Infallible;
 use std::error::Error;
-use std::ffi::c_void;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
