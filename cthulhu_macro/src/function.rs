@@ -20,9 +20,7 @@ fn gen_throw(fallback: Option<TokenStream>, no_return: bool) -> TokenStream {
         {
             if let Some(callback) = __exception {
                 let err = format!("{:?}", e);
-                let s = std::ffi::CString::new(err)
-                    .unwrap_or_else(|_| std::ffi::CString::new("<unknown>".to_string()).unwrap());
-                callback(s.as_ptr().cast());
+                callback(err.as_bytes().as_ptr().cast(), err.len());
                 
             }
             #fallback

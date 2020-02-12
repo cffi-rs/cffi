@@ -38,7 +38,7 @@ pub use string::StringMarshaler;
 pub use unit::UnitMarshaler;
 pub use vec_ref::VecRefMarshaler;
 
-pub type ErrCallback = Option<extern "C" fn(*const c_void, usize)>;
+pub type ErrCallback = Option<extern "C" fn(*const u8, usize)>;
 pub type RetCallback<T> = Option<extern "C" fn(T)>;
 
 pub trait ReturnType {
