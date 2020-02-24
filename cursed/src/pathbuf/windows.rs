@@ -52,10 +52,7 @@ impl ToForeign<PathBuf, Slice<u16>> for PathBufMarshaler {
 
         let mut vec: Vec<wchar_t> =
             input.into_os_string().encode_wide().chain(Some(0).into_iter()).collect();
-        vec.shrink_to_fit();
-        let ptr = vec.as_ptr();
-        std::mem::forget(vec);
-        Ok(ptr)
+        VecMarshaler::to_foreign(vec)
     }
 }
 
