@@ -44,7 +44,7 @@ impl FromForeign<Slice<u16>, PathBuf> for PathBufMarshaler {
 }
 
 impl ToForeign<PathBuf, Slice<u16>> for PathBufMarshaler {
-    type Error = Box<dyn Error>;
+    type Error = Infallible;
 
     #[inline(always)]
     fn to_foreign(input: PathBuf) -> Result<Slice<u16>, Self::Error> {
