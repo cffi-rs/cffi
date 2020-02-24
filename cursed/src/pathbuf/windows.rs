@@ -1,16 +1,16 @@
 use std::convert::Infallible;
+use std::error::Error;
 use std::ffi::CStr;
 use std::path::{Path, PathBuf};
-use std::error::Error;
 
 #[cfg(unix)]
 use libc::c_char;
 #[cfg(windows)]
 use libc::wchar_t;
 
-use super::null_ptr_error;
-use super::vec::VecMarshaler;
-use super::{FromForeign, InputType, ReturnType, ToForeign, Slice};
+use crate::null_ptr_error;
+use crate::vec::VecMarshaler;
+use crate::{FromForeign, InputType, ReturnType, Slice, ToForeign};
 
 pub struct PathBufMarshaler;
 
@@ -35,7 +35,7 @@ impl FromForeign<Slice<u16>, PathBuf> for PathBufMarshaler {
         if wstr.data.is_null() {
             return Err(null_ptr_error());
         }
-        
+
         use std::os::windows::ffi::OsStringExt;
         let slice: &[u16] = std::slice::from_raw_parts(wstr.data, wstr.len);
         let osstr = std::ffi::OsString::from_wide(slice);
