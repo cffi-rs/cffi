@@ -3,7 +3,7 @@ use std::error::Error;
 use std::marker::PhantomData;
 
 use super::null_ptr_error;
-use super::{FromForeign, InputType, ReturnType, ToForeign, Slice};
+use super::{FromForeign, InputType, ReturnType, Slice, ToForeign};
 pub struct VecMarshaler<T>(PhantomData<T>);
 
 impl<T> InputType for VecMarshaler<T> {

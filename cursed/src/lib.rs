@@ -1,7 +1,4 @@
-use std::{
-    ffi::c_void,
-    io,
-};
+use std::{ffi::c_void, io};
 
 // Re-export for certain classes of crime
 pub use ctor::ctor;
@@ -121,7 +118,5 @@ impl<T> AsRef<[T]> for Slice<T> {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn test() {
-
-    }
+    fn test() {}
 }

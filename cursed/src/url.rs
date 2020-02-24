@@ -4,7 +4,7 @@ use std::ffi::CString;
 use libc::c_char;
 use url::Url;
 
-use super::{FromForeign, InputType, ReturnType, ToForeign, Slice};
+use super::{FromForeign, InputType, ReturnType, Slice, ToForeign};
 
 pub struct UrlMarshaler;
 

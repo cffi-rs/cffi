@@ -31,7 +31,7 @@ pub fn call_with_function(
         style: syn::AttrStyle::Outer,
         bracket_token: syn::token::Bracket::default(),
         path: syn::parse2(quote! { inline }).unwrap(),
-        tokens: quote! { (always) }
+        tokens: quote! { (always) },
     };
     fn_item.attrs.push(attr);
 
@@ -48,7 +48,7 @@ pub fn call_with_function(
         return_type,
         InnerFn::FunctionBody(fn_item),
         fn_marshal_attr,
-        callback
+        callback,
     )?;
 
     function.to_token_stream()

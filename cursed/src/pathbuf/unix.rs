@@ -1,13 +1,13 @@
 use std::convert::Infallible;
-use std::path::{Path, PathBuf};
 use std::error::Error;
+use std::path::{Path, PathBuf};
 
 #[cfg(windows)]
 use libc::wchar_t;
 
 use crate::null_ptr_error;
 use crate::vec::VecMarshaler;
-use crate::{FromForeign, InputType, ReturnType, ToForeign, Slice};
+use crate::{FromForeign, InputType, ReturnType, Slice, ToForeign};
 
 pub struct PathBufMarshaler;
 

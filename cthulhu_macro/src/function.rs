@@ -1,8 +1,8 @@
 use proc_macro2::TokenStream;
 use quote::quote;
+use serde::Serialize;
 use std::fmt::{self, Debug};
 use syn::punctuated::Punctuated;
-use serde::Serialize;
 
 use crate::attr::{marshal::MarshalAttr, Mapping};
 use crate::ext::*;
@@ -10,25 +10,25 @@ use crate::ptr_type::PtrType;
 use crate::return_type::ReturnType;
 
 fn gen_throw(fallback: Option<TokenStream>, no_return: bool) -> TokenStream {
-    let fallback = if no_return {
-        None
-    } else {
-        Some(quote!{ return #fallback; })
-    };
+    let fallback = if no_return { None } else { Some(quote! { return #fallback; }) };
 
     quote! {
         {
             if let Some(callback) = __exception {
                 let err = format!("{:?}", e);
                 callback(err.as_bytes().as_ptr().cast(), err.len());
-                
+
             }
             #fallback
         }
     }
 }
 
-fn gen_try_not_null(path: TokenStream, fallback: Option<TokenStream>, no_return: bool) -> TokenStream {
+fn gen_try_not_null(
+    path: TokenStream,
+    fallback: Option<TokenStream>,
+    no_return: bool,
+) -> TokenStream {
     let throw = gen_throw(fallback, no_return);
 
     quote! {
@@ -55,7 +55,8 @@ fn gen_foreign(
             } else {
                 quote! { <#out_marshaler as ::cursed::ReturnType>::foreign_default() }
             }
-        }), false,
+        }),
+        false,
     );
 
     quote! { let #name: #out_ty = #block; }
@@ -139,16 +140,14 @@ impl TypeMarshalExt for syn::ReturnType {
 impl TypeMarshalExt for syn::Type {
     fn pointer_type(&self) -> Option<PtrType> {
         match self {
-            syn::Type::Ptr(ty) => {
-                Some(match ty.const_token {
-                    Some(_) => PtrType::Const,
-                    None => PtrType::Mut
-                })
-            }
-            _ => None
+            syn::Type::Ptr(ty) => Some(match ty.const_token {
+                Some(_) => PtrType::Const,
+                None => PtrType::Mut,
+            }),
+            _ => None,
         }
     }
-    
+
     fn resolve_marshaler<'a>(
         &self,
         marshaler_attr: Option<&'a MarshalAttr>,
@@ -166,7 +165,7 @@ impl PatExt for syn::Pat {
         match self {
             syn::Pat::Ident(ident) => Some(ident.ident.clone()),
             syn::Pat::Verbatim(ident) => Some(syn::parse2(ident.clone()).unwrap()),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -186,8 +185,8 @@ mod c {
                         "TODO"
                     }
                 }
-            },
-            None => "void"
+            }
+            None => "void",
         }
     }
 
@@ -195,16 +194,21 @@ mod c {
         // Get return type for C
         let return_type = c_type(function.return_type.foreign_type());
 
-        let params = function.foreign_params.iter().map(|fn_arg| {
-            let name = fn_arg.pat.ident().map(|x| x.to_string()).unwrap();
-            
-            if name == "__exception" {
-                "void (*exception)(const char*)".into()
-            } else {
-                let ty = c_type(Some((*fn_arg.ty).clone()));
-                format!("{} {}", ty, name)
-            }
-        }).collect::<Vec<_>>().join(", ");
+        let params = function
+            .foreign_params
+            .iter()
+            .map(|fn_arg| {
+                let name = fn_arg.pat.ident().map(|x| x.to_string()).unwrap();
+
+                if name == "__exception" {
+                    "void (*exception)(const char*)".into()
+                } else {
+                    let ty = c_type(Some((*fn_arg.ty).clone()));
+                    format!("{} {}", ty, name)
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
 
         log::debug!("{} {}({});", return_type, function.name, params);
 
@@ -220,7 +224,7 @@ impl Function {
         return_type: ReturnType,
         inner_fn: InnerFn,
         fn_marshal_attr: Option<MarshalAttr>,
-        has_callback: bool
+        has_callback: bool,
     ) -> Result<Function, syn::Error> {
         let mut from_foreigns = TokenStream::new();
         let mut foreign_params: Punctuated<syn::PatType, syn::Token![,]> = Punctuated::new();
@@ -244,8 +248,10 @@ impl Function {
             // }
             if let Some(marshaler) = mapping.marshaler.as_ref() {
                 let path = &marshaler.path;
-                in_type.ty = Box::new(syn::Type::Verbatim(quote! { <#path as ::cursed::InputType>::Foreign }));
-                
+                in_type.ty = Box::new(syn::Type::Verbatim(
+                    quote! { <#path as ::cursed::InputType>::Foreign },
+                ));
+
                 let foreign = gen_foreign(
                     &marshaler.path,
                     &name,
@@ -260,7 +266,6 @@ impl Function {
                 in_type.ty = Box::new(syn::Type::Verbatim(quote! {
                     <::cursed::BoxMarshaler::<#out_type> as ::cursed::InputType>::Foreign
                 }));
-               
 
                 let box_marshaler = syn::parse2(quote! { ::cursed::BoxMarshaler::<#out_type> })?;
                 let foreign = gen_foreign(
@@ -350,7 +355,7 @@ impl Function {
                 quote! { <#return_marshaler as ::cursed::ReturnType>::Foreign }
             })
 
-            // sig.extend(ret);
+        // sig.extend(ret);
         } else {
             None
         };
@@ -416,9 +421,12 @@ impl Function {
                     }
                 };
 
-                let throw = gen_throw(Some(quote! {
-                    <#return_marshaler as ::cursed::ReturnType>::foreign_default()
-                }), self.has_callback);
+                let throw = gen_throw(
+                    Some(quote! {
+                        <#return_marshaler as ::cursed::ReturnType>::foreign_default()
+                    }),
+                    self.has_callback,
+                );
 
                 if self.has_callback {
                     inner_block.extend(quote! {

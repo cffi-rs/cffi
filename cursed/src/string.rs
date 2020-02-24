@@ -1,7 +1,7 @@
-use std::error::Error;
 use std::convert::Infallible;
+use std::error::Error;
 
-use super::{FromForeign, InputType, ReturnType, ToForeign, Slice, vec::VecMarshaler};
+use super::{vec::VecMarshaler, FromForeign, InputType, ReturnType, Slice, ToForeign};
 
 pub struct StringMarshaler;
 
@@ -43,7 +43,7 @@ impl ToForeign<Option<String>, Slice<u8>> for StringMarshaler {
     fn to_foreign(option: Option<String>) -> Result<Slice<u8>, Self::Error> {
         match option {
             None => Ok(Slice::default()),
-            Some(v) => Ok(StringMarshaler::to_foreign(v).unwrap())
+            Some(v) => Ok(StringMarshaler::to_foreign(v).unwrap()),
         }
     }
 }
@@ -62,4 +62,3 @@ impl<'a> FromForeign<Slice<u8>, String> for StringMarshaler {
 pub unsafe extern "C" fn cursed_string_free(slice: Slice<u8>) {
     crate::vec::cursed_vec_free(slice.cast());
 }
-
