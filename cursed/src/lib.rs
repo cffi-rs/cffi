@@ -1,5 +1,3 @@
-use std::{ffi::c_void, io};
-
 // Re-export for certain classes of crime
 pub use ctor::ctor;
 
@@ -34,6 +32,8 @@ pub use copy::CopyMarshaler;
 pub use string::StringMarshaler;
 pub use unit::UnitMarshaler;
 pub use vec_ref::VecRefMarshaler;
+
+use std::io;
 
 pub type ErrCallback = Option<extern "C" fn(*const u8, usize)>;
 pub type RetCallback<T> = Option<extern "C" fn(T)>;

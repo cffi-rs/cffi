@@ -45,7 +45,10 @@ impl ToForeign<Option<Url>, Slice<u8>> for UrlMarshaler {
 
     #[inline(always)]
     fn to_foreign(option: Option<Url>) -> Result<Slice<u8>, Self::Error> {
-        option.map_or_else(|| Ok(Default::default()), |url| Ok(UrlMarshaler::to_foreign(url).unwrap()))
+        option.map_or_else(
+            || Ok(Default::default()),
+            |url| Ok(UrlMarshaler::to_foreign(url).unwrap()),
+        )
     }
 }
 

@@ -1,7 +1,6 @@
 use std::convert::Infallible;
 use std::error::Error;
-use std::ffi::CStr;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[cfg(unix)]
 use libc::c_char;
@@ -50,7 +49,7 @@ impl ToForeign<PathBuf, Slice<u16>> for PathBufMarshaler {
     fn to_foreign(input: PathBuf) -> Result<Slice<u16>, Self::Error> {
         use std::os::windows::ffi::OsStrExt;
 
-        let mut vec: Vec<wchar_t> =
+        let vec: Vec<wchar_t> =
             input.into_os_string().encode_wide().chain(Some(0).into_iter()).collect();
         VecMarshaler::to_foreign(vec)
     }
