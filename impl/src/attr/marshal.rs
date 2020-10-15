@@ -18,7 +18,13 @@ impl Debug for MarshalAttr {
 
         fmt.debug_struct("MarshalAttr")
             .field("path", &quote! { #path }.to_string())
-            .field("types", &types.iter().map(|x| quote! { #x }.to_string()).collect::<Vec<_>>())
+            .field(
+                "types",
+                &types
+                    .iter()
+                    .map(|x| quote! { #x }.to_string())
+                    .collect::<Vec<_>>(),
+            )
             .finish()
     }
 }
@@ -41,7 +47,10 @@ impl MarshalAttr {
     }
 
     pub fn from_defaults_by_type(ty: &syn::Type) -> Option<MarshalAttr> {
-        crate::default_marshaler(&ty).map(|x| MarshalAttr { path: x.clone(), types: vec![] })
+        crate::default_marshaler(&ty).map(|x| MarshalAttr {
+            path: x.clone(),
+            types: vec![],
+        })
     }
 
     pub fn from_defaults_by_return_type(ty: &syn::ReturnType) -> Option<MarshalAttr> {
@@ -69,19 +78,31 @@ impl MarshalAttr {
 
     fn from_bare_fn(bare_fn: syn::TypeBareFn) -> Result<Option<MarshalAttr>, syn::Error> {
         if bare_fn.lifetimes.is_some() {
-            return Err(syn::Error::new_spanned(bare_fn, "Marshal fn may not have lifetimes"));
+            return Err(syn::Error::new_spanned(
+                bare_fn,
+                "Marshal fn may not have lifetimes",
+            ));
         }
 
         if bare_fn.unsafety.is_some() {
-            return Err(syn::Error::new_spanned(bare_fn, "Marshal fn may not have unsafety"));
+            return Err(syn::Error::new_spanned(
+                bare_fn,
+                "Marshal fn may not have unsafety",
+            ));
         }
 
         if bare_fn.abi.is_some() {
-            return Err(syn::Error::new_spanned(bare_fn, "Marshal fn may not have abi"));
+            return Err(syn::Error::new_spanned(
+                bare_fn,
+                "Marshal fn may not have abi",
+            ));
         }
 
         if bare_fn.variadic.is_some() {
-            return Err(syn::Error::new_spanned(bare_fn, "Marshal fn may not have variadic"));
+            return Err(syn::Error::new_spanned(
+                bare_fn,
+                "Marshal fn may not have variadic",
+            ));
         }
 
         // TODO: not this, not here.

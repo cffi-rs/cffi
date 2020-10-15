@@ -14,7 +14,10 @@ impl<T> ReturnType for VecMarshaler<T> {
     type Foreign = Slice<T>;
 
     fn foreign_default() -> Self::Foreign {
-        Slice { data: std::ptr::null_mut(), len: 0 }
+        Slice {
+            data: std::ptr::null_mut(),
+            len: 0,
+        }
     }
 }
 

@@ -9,7 +9,11 @@ use crate::ptr_type::PtrType;
 use crate::return_type::ReturnType;
 
 fn gen_throw(fallback: Option<TokenStream>, no_return: bool) -> TokenStream {
-    let fallback = if no_return { None } else { Some(quote! { return #fallback; }) };
+    let fallback = if no_return {
+        None
+    } else {
+        Some(quote! { return #fallback; })
+    };
 
     quote! {
         {
@@ -92,7 +96,13 @@ pub struct Function {
 
 impl std::fmt::Debug for Function {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let Function { name, foreign_params, foreign_args, from_foreigns, .. } = &self;
+        let Function {
+            name,
+            foreign_params,
+            foreign_args,
+            from_foreigns,
+            ..
+        } = &self;
 
         fmt.debug_struct("Function")
             .field("name", &format!("{}", quote! { #name }))
@@ -228,7 +238,9 @@ impl Function {
         let mut from_foreigns = TokenStream::new();
         let mut foreign_params: Punctuated<syn::PatType, syn::Token![,]> = Punctuated::new();
         let mut foreign_args: Punctuated<syn::Pat, syn::Token![,]> = Punctuated::new();
-        let return_marshaler = return_type.local.resolve_marshaler(fn_marshal_attr.as_ref());
+        let return_marshaler = return_type
+            .local
+            .resolve_marshaler(fn_marshal_attr.as_ref());
 
         let mut has_exceptions = false;
 
@@ -237,9 +249,12 @@ impl Function {
             let out_type = &mapping.output_type;
             let marshaler = &mapping.marshaler;
 
-            let name = param.to_foreign_arg().context("failed to convert Rust type to FFI type")?;
-            let mut in_type =
-                param.to_foreign_param().context("failed to convert Rust type to FFI type")?;
+            let name = param
+                .to_foreign_arg()
+                .context("failed to convert Rust type to FFI type")?;
+            let mut in_type = param
+                .to_foreign_param()
+                .context("failed to convert Rust type to FFI type")?;
 
             // if let Some(in_ty_override) = marshaler.as_ref().and_then(|m| m.types.first().cloned())
             // {
@@ -283,8 +298,10 @@ impl Function {
             foreign_args.push(name);
         }
 
-        let passthrough_return =
-            return_type.local_type().map(|ty| crate::is_passthrough_type(&ty)).unwrap_or(true);
+        let passthrough_return = return_type
+            .local_type()
+            .map(|ty| crate::is_passthrough_type(&ty))
+            .unwrap_or(true);
 
         if has_exceptions || !passthrough_return {
             foreign_params.push(syn::PatType {
@@ -328,7 +345,11 @@ impl Function {
     }
 
     fn build_signature(&self) -> Result<TokenStream, syn::Error> {
-        let Self { name, foreign_params, .. } = self;
+        let Self {
+            name,
+            foreign_params,
+            ..
+        } = self;
 
         let mut sig = quote! {
             #[no_mangle]
@@ -373,7 +394,12 @@ impl Function {
     }
 
     fn build_inner_block(&self) -> Result<TokenStream, syn::Error> {
-        let Self { name, from_foreigns, foreign_args, .. } = self;
+        let Self {
+            name,
+            from_foreigns,
+            foreign_args,
+            ..
+        } = self;
 
         // If we have a function body, inject it or just ignore it
         let original_fn = match &self.inner_fn {

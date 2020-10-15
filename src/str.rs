@@ -27,7 +27,10 @@ impl<'a> ToForeign<&'a str, Slice<u8>> for StrMarshaler<'a> {
         let bytes = input.to_owned().into_boxed_str().into_boxed_bytes();
         let len = bytes.len();
 
-        Ok(Slice { data: Box::into_raw(bytes) as _, len })
+        Ok(Slice {
+            data: Box::into_raw(bytes) as _,
+            len,
+        })
     }
 }
 
@@ -55,6 +58,8 @@ impl<'a> FromForeign<Slice<u8>, Option<&'a str>> for StrMarshaler<'a> {
         }
 
         let r = std::slice::from_raw_parts(slice.data as _, slice.len);
-        std::str::from_utf8(r).map(Some).map_err(|e| Box::new(e) as _)
+        std::str::from_utf8(r)
+            .map(Some)
+            .map_err(|e| Box::new(e) as _)
     }
 }

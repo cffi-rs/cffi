@@ -94,7 +94,10 @@ impl<T> Slice<T> {
 
 impl<T> std::default::Default for Slice<T> {
     fn default() -> Self {
-        Slice { data: std::ptr::null_mut(), len: 0 }
+        Slice {
+            data: std::ptr::null_mut(),
+            len: 0,
+        }
     }
 }
 

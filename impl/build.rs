@@ -54,11 +54,17 @@ fn main() {
     let path = Path::new(&env::var("OUT_DIR").unwrap()).join("codegen.rs");
     let mut file = BufWriter::new(File::create(&path).unwrap());
 
-    write!(&mut file, "static DEFAULT_MARSHALERS: phf::Map<&'static str, &'static str> = ")
-        .unwrap();
+    write!(
+        &mut file,
+        "static DEFAULT_MARSHALERS: phf::Map<&'static str, &'static str> = "
+    )
+    .unwrap();
     let mut map = phf_codegen::Map::new();
     for (key, value) in default_marshalers.iter() {
-        map.entry(quote! { #key }.to_string(), &format!("\"{}\"", quote! { #value }.to_string()));
+        map.entry(
+            quote! { #key }.to_string(),
+            &format!("\"{}\"", quote! { #value }.to_string()),
+        );
     }
     map.build(&mut file).unwrap();
     write!(&mut file, ";\n").unwrap();
@@ -86,7 +92,11 @@ fn main() {
     write!(
         &mut file,
         "static PASSTHROUGH_TYPES: &[&str] = &[\"{}\"];\n",
-        types.into_iter().map(|x| quote! { #x }.to_string()).collect::<Vec<_>>().join("\", \"")
+        types
+            .into_iter()
+            .map(|x| quote! { #x }.to_string())
+            .collect::<Vec<_>>()
+            .join("\", \"")
     )
     .unwrap();
 }

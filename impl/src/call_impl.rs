@@ -18,37 +18,52 @@ pub(crate) fn call_with_impl(
     });
 
     if let Some(defaultness) = item.defaultness {
-        return Err(syn::Error::new_spanned(&defaultness, "Does not support specialised impls"));
+        return Err(syn::Error::new_spanned(
+            &defaultness,
+            "Does not support specialised impls",
+        ));
     }
 
     if let Some(unsafety) = item.unsafety {
-        return Err(syn::Error::new_spanned(&unsafety, "Does not support unsafe impls"));
+        return Err(syn::Error::new_spanned(
+            &unsafety,
+            "Does not support unsafe impls",
+        ));
     }
 
     if !item.generics.params.is_empty() {
-        return Err(syn::Error::new_spanned(&item.generics, "Does not support generic impls"));
+        return Err(syn::Error::new_spanned(
+            &item.generics,
+            "Does not support generic impls",
+        ));
     }
 
     if let Some(trait_) = item.trait_ {
-        return Err(syn::Error::new_spanned(&trait_.1, "Does not support trait impls"));
+        return Err(syn::Error::new_spanned(
+            &trait_.1,
+            "Does not support trait impls",
+        ));
     }
 
     let self_ty = &*item.self_ty;
     let invoke_prefix = prefix.unwrap_or_else(|| "".into());
     let prefix = format!("{}_{}", invoke_prefix, quote! { #self_ty }).to_snake_case();
-    let pub_methods = item.items.iter_mut().filter_map(|impl_item| match impl_item {
-        syn::ImplItem::Method(method) => match (
-            &method.vis,
-            method.sig.asyncness,
-            method.sig.unsafety,
-            &method.sig.abi,
-            &method.sig.generics.params.is_empty(),
-        ) {
-            (syn::Visibility::Public(_), None, None, None, true) => Some(method),
+    let pub_methods = item
+        .items
+        .iter_mut()
+        .filter_map(|impl_item| match impl_item {
+            syn::ImplItem::Method(method) => match (
+                &method.vis,
+                method.sig.asyncness,
+                method.sig.unsafety,
+                &method.sig.abi,
+                &method.sig.generics.params.is_empty(),
+            ) {
+                (syn::Visibility::Public(_), None, None, None, true) => Some(method),
+                _ => None,
+            },
             _ => None,
-        },
-        _ => None,
-    });
+        });
 
     let foreign_methods = pub_methods
         .map(|x| {
@@ -82,7 +97,11 @@ pub(crate) fn call_with_impl(
 
             let attr = idents.pop();
 
-            let syn::Signature { inputs: params, output: local_return_type, .. } = x.sig.clone();
+            let syn::Signature {
+                inputs: params,
+                output: local_return_type,
+                ..
+            } = x.sig.clone();
 
             let fn_marshal_attr = match attr.map(|x| x.path) {
                 Some(p) => MarshalAttr::from_path(p)?,

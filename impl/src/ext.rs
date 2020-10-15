@@ -9,7 +9,11 @@ pub trait ForeignArgExt {
 
 impl ForeignArgExt for syn::PatType {
     fn to_foreign_param(&self) -> Result<syn::PatType, syn::Error> {
-        Ok(syn::PatType { ty: Box::new(self.ty.to_foreign_type()?), ..self.clone() }.into())
+        Ok(syn::PatType {
+            ty: Box::new(self.ty.to_foreign_type()?),
+            ..self.clone()
+        }
+        .into())
     }
 
     fn to_foreign_arg(&self) -> Result<syn::Pat, syn::Error> {
@@ -68,9 +72,17 @@ impl ForeignTypeExt for syn::Type {
                 ));
             }
             syn::Type::Tuple(..) => {
-                return Err(syn::Error::new_spanned(self, "Tuple parameters not supported"))
+                return Err(syn::Error::new_spanned(
+                    self,
+                    "Tuple parameters not supported",
+                ))
             }
-            _ => return Err(syn::Error::new_spanned(self, "Unknown parameters not supported")),
+            _ => {
+                return Err(syn::Error::new_spanned(
+                    self,
+                    "Unknown parameters not supported",
+                ))
+            }
         }
 
         // Special case for bool
@@ -96,7 +108,10 @@ pub trait ErrorExt<T> {
 impl<T> ErrorExt<T> for Result<T, syn::Error> {
     fn context(self, msg: impl Display) -> Self {
         match self {
-            Err(err) => Err(syn::Error::new(err.span(), format!("{}: {}", msg, err.to_string()))),
+            Err(err) => Err(syn::Error::new(
+                err.span(),
+                format!("{}: {}", msg, err.to_string()),
+            )),
             x => x,
         }
     }

@@ -11,7 +11,11 @@ pub struct Mapping {
 
 impl Mapping {
     pub fn self_type(receiver: &syn::Receiver, parent: &syn::Type) -> Result<Mapping, syn::Error> {
-        let syn::Receiver { reference, mutability, .. } = receiver.clone();
+        let syn::Receiver {
+            reference,
+            mutability,
+            ..
+        } = receiver.clone();
 
         let path = match parent {
             syn::Type::Path(path) => path,
@@ -28,7 +32,10 @@ impl Mapping {
             }),
         };
 
-        Ok(Mapping { output_type, marshaler: MarshalAttr::self_type() })
+        Ok(Mapping {
+            output_type,
+            marshaler: MarshalAttr::self_type(),
+        })
     }
 }
 
@@ -112,7 +119,10 @@ impl SignatureExt for syn::Signature {
                     Err(e) => return Some(Err(e)),
                 };
 
-                Some(Ok(Mapping { output_type: *input.ty.clone(), marshaler }))
+                Some(Ok(Mapping {
+                    output_type: *input.ty.clone(),
+                    marshaler,
+                }))
             })
             .collect::<Result<Vec<_>, _>>()
     }

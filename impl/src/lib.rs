@@ -1,10 +1,10 @@
 extern crate proc_macro;
 
-use darling::FromMeta;
-use syn::AttributeArgs;
 use ctor::ctor;
+use darling::FromMeta;
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::AttributeArgs;
 
 mod attr;
 mod call_fn;
@@ -18,7 +18,10 @@ use attr::invoke::InvokeParams;
 use ext::*;
 
 #[proc_macro_attribute]
-pub fn marshal(params: proc_macro::TokenStream, function: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn marshal(
+    params: proc_macro::TokenStream,
+    function: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
     let params = syn::parse_macro_input!(params as AttributeArgs);
 
     let params = match InvokeParams::from_list(&params) {
@@ -28,12 +31,11 @@ pub fn marshal(params: proc_macro::TokenStream, function: proc_macro::TokenStrea
 
     match call_with(params, function.into()) {
         Ok(tokens) => tokens.into(),
-        Err(err) => {
-            proc_macro::TokenStream::from(syn::Error::new(err.span(), err.to_string()).to_compile_error())
-        }
+        Err(err) => proc_macro::TokenStream::from(
+            syn::Error::new(err.span(), err.to_string()).to_compile_error(),
+        ),
     }
 }
-
 
 #[ctor]
 fn init() {
@@ -79,10 +81,7 @@ fn init() {
 //     }
 // }
 
-fn call_with(
-    invoke_params: InvokeParams,
-    item: TokenStream,
-) -> Result<TokenStream, syn::Error> {
+fn call_with(invoke_params: InvokeParams, item: TokenStream) -> Result<TokenStream, syn::Error> {
     // if let Some(value) = invoke_params.send_help.as_ref() {
     //     log::debug!("HELP REQUESTED: {}", value);
     //     return Ok(item);
@@ -101,7 +100,10 @@ fn call_with(
         syn::Item::Impl(item) => call_impl::call_with_impl(invoke_params.prefix, item),
         item => {
             log::error!("{:?}", &item);
-            Err(syn::Error::new_spanned(&item, "Only supported on functions and impls"))
+            Err(syn::Error::new_spanned(
+                &item,
+                "Only supported on functions and impls",
+            ))
         }
     };
 
@@ -117,7 +119,9 @@ fn call_with(
 include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
 
 pub(crate) fn default_marshaler(ty: &syn::Type) -> Option<syn::Path> {
-    DEFAULT_MARSHALERS.get(&*quote! { #ty }.to_string()).and_then(|x| syn::parse_str(x).ok())
+    DEFAULT_MARSHALERS
+        .get(&*quote! { #ty }.to_string())
+        .and_then(|x| syn::parse_str(x).ok())
 }
 
 pub(crate) fn is_passthrough_type(ty: &syn::Type) -> bool {
