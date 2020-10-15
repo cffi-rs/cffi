@@ -1,0 +1,34 @@
+[package]
+name = "cffi-impl"
+description = "Safe* C FFI interface generator - macro"
+version = "0.1.0"
+authors = [
+  "Brendan Molloy <brendan@bbqsrc.net>",
+  "Pascal Hertleif <pascal@technocreatives.com>"
+]
+edition = "2018"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/cffi-rs/cffi"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = "1.0.44"
+quote = "1.0.7"
+proc-macro2 = "1.0.24"
+darling = "0.10.2"
+heck = "0.3"
+ctor = "0.1.16"
+log = "0.4.11"
+pretty_env_logger = "0.4.0"
+phf = "0.7.24"
+
+[dev-dependencies]
+assert_tokens_eq = { git = "https://github.com/killercup/assert_tokens_eq" }
+
+[build-dependencies]
+phf_codegen = "0.7.24"
+syn = { version = "1.0.5", features = ["full", "extra-traits"] }
+quote = "1.0.2"
+proc-macro2 = "1.0.4"

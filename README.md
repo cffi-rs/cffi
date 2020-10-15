@@ -1,4 +1,4 @@
-# Cthulhu
+# cffi
 
 Generate FFI-compatible `extern fn` from harmless `fn`s using the power of proc
 macros. If you are wondering which ABI this is, remember: You can't spell

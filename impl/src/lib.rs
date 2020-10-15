@@ -1,7 +1,10 @@
+extern crate proc_macro;
+
+use darling::FromMeta;
+use syn::AttributeArgs;
 use ctor::ctor;
 use proc_macro2::TokenStream;
 use quote::quote;
-use std::path::PathBuf;
 
 mod attr;
 mod call_fn;
@@ -11,35 +14,53 @@ mod function;
 mod ptr_type;
 mod return_type;
 
-pub use attr::invoke::InvokeParams;
+use attr::invoke::InvokeParams;
 use ext::*;
+
+#[proc_macro_attribute]
+pub fn marshal(params: proc_macro::TokenStream, function: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let params = syn::parse_macro_input!(params as AttributeArgs);
+
+    let params = match InvokeParams::from_list(&params) {
+        Ok(v) => v,
+        Err(err) => return err.write_errors().into(),
+    };
+
+    match call_with(params, function.into()) {
+        Ok(tokens) => tokens.into(),
+        Err(err) => {
+            proc_macro::TokenStream::from(syn::Error::new(err.span(), err.to_string()).to_compile_error())
+        }
+    }
+}
+
 
 #[ctor]
 fn init() {
     pretty_env_logger::init();
 }
 
-fn json_output_path() -> PathBuf {
-    std::path::Path::new(&std::env::var("OUT_DIR").unwrap()).join("cthulhu.json")
-}
+// fn json_output_path() -> PathBuf {
+//     std::path::Path::new(&std::env::var("OUT_DIR").unwrap()).join("cthulhu.json")
+// }
 
-fn is_exporting() -> bool {
-    let target = std::env::var("CTHULHU_PKG").ok();
+// fn is_exporting() -> bool {
+//     let target = std::env::var("CTHULHU_PKG").ok();
 
-    if let Some(target) = target {
-        let name = match std::env::var("CARGO_PKG_NAME").ok() {
-            Some(v) => v,
-            None => return false,
-        };
-        let version = match std::env::var("CARGO_PKG_VERSION").ok() {
-            Some(v) => v,
-            None => return false,
-        };
-        format!("{}-{}", name, version) == target
-    } else {
-        false
-    }
-}
+//     if let Some(target) = target {
+//         let name = match std::env::var("CARGO_PKG_NAME").ok() {
+//             Some(v) => v,
+//             None => return false,
+//         };
+//         let version = match std::env::var("CARGO_PKG_VERSION").ok() {
+//             Some(v) => v,
+//             None => return false,
+//         };
+//         format!("{}-{}", name, version) == target
+//     } else {
+//         false
+//     }
+// }
 
 // pub(crate) struct Context {
 //     pkg_name: String,
@@ -58,7 +79,7 @@ fn is_exporting() -> bool {
 //     }
 // }
 
-pub fn call_with(
+fn call_with(
     invoke_params: InvokeParams,
     item: TokenStream,
 ) -> Result<TokenStream, syn::Error> {

@@ -1,6 +1,5 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use serde::Serialize;
 use std::fmt::{self, Debug};
 use syn::punctuated::Punctuated;
 
@@ -71,8 +70,8 @@ impl Debug for InnerFn {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_tuple("InnerFn")
             .field(&match self {
-                InnerFn::FunctionBody(item_fn) => "FunctionBody".to_string(),
-                InnerFn::FunctionCall(path) => "FunctionCall".to_string(),
+                InnerFn::FunctionBody(_item_fn) => "FunctionBody".to_string(),
+                InnerFn::FunctionCall(_path) => "FunctionCall".to_string(),
             })
             .finish()
     }

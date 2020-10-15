@@ -1,7 +1,26 @@
-[workspace]
-members = [
-  "cursed",
-  "cthulhu",
-  "cthulhu_tests",
-  "cthulhu_macro"
+[package]
+name = "cffi"
+description = "Safe* C FFI interface generation"
+version = "0.1.0"
+authors = [
+  "Brendan Molloy <brendan@bbqsrc.net>",
+  "Pascal Hertleif <pascal@technocreatives.com>"
 ]
+edition = "2018"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/cffi-rs/cffi"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+cffi-impl = { path = "./impl" }
+libc = "0.2.79"
+log = "0.4.11"
+url = { version = "2.1.1", optional = true }
+
+[features]
+default = []
+
+[workspace]
+members = ["impl"]
