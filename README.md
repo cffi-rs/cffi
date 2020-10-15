@@ -1,3 +1,6 @@
+[![Actions Status](https://github.com/cffi-rs/cffi/workflows/CI/badge.svg)](https://github.com/cffi-rs/cffi/actions)
+[![Documentation](https://docs.rs/cffi/badge.svg)](https://docs.rs/cffi)
+
 # cffi
 
 Use the `#[cffi::marshal(...)]` proc macro to make unsafe C functions into much safer functions,
