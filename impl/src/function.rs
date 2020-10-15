@@ -81,6 +81,7 @@ impl Debug for InnerFn {
     }
 }
 
+#[allow(dead_code)]
 pub struct Function {
     name: syn::Ident,
     foreign_params: Punctuated<syn::PatType, syn::Token![,]>,
@@ -247,7 +248,7 @@ impl Function {
         for (i, param) in params.iter().enumerate() {
             let mapping = &mappings[i];
             let out_type = &mapping.output_type;
-            let marshaler = &mapping.marshaler;
+            let _marshaler = &mapping.marshaler;
 
             let name = param
                 .to_foreign_arg()
