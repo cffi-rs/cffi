@@ -57,6 +57,6 @@ impl<T> FromForeign<Slice<T>, Vec<T>> for VecMarshaler<T> {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn cursed_vec_free(slice: Slice<libc::c_void>) {
+pub unsafe extern "C" fn cffi_vec_free(slice: Slice<libc::c_void>) {
     Vec::from_raw_parts(slice.data, slice.len, slice.len);
 }

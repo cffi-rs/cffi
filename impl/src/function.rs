@@ -56,7 +56,7 @@ fn gen_foreign(
             if crate::is_passthrough_type(ty) {
                 quote! { <#ty>::default() }
             } else {
-                quote! { <#out_marshaler as ::cursed::ReturnType>::foreign_default() }
+                quote! { <#out_marshaler as ::cffi::ReturnType>::foreign_default() }
             }
         }),
         false,
@@ -264,7 +264,7 @@ impl Function {
             if let Some(marshaler) = mapping.marshaler.as_ref() {
                 let path = &marshaler.path;
                 in_type.ty = Box::new(syn::Type::Verbatim(
-                    quote! { <#path as ::cursed::InputType>::Foreign },
+                    quote! { <#path as ::cffi::InputType>::Foreign },
                 ));
 
                 let foreign = gen_foreign(
@@ -279,10 +279,10 @@ impl Function {
                 has_exceptions = true;
             } else if !crate::is_passthrough_type(&out_type) {
                 in_type.ty = Box::new(syn::Type::Verbatim(quote! {
-                    <::cursed::BoxMarshaler::<#out_type> as ::cursed::InputType>::Foreign
+                    <::cffi::BoxMarshaler::<#out_type> as ::cffi::InputType>::Foreign
                 }));
 
-                let box_marshaler = syn::parse2(quote! { ::cursed::BoxMarshaler::<#out_type> })?;
+                let box_marshaler = syn::parse2(quote! { ::cffi::BoxMarshaler::<#out_type> })?;
                 let foreign = gen_foreign(
                     &box_marshaler,
                     &name,
@@ -309,7 +309,7 @@ impl Function {
                 attrs: vec![],
                 pat: Box::new(syn::Pat::Verbatim(quote! { __exception })),
                 colon_token: <syn::Token![:]>::default(),
-                ty: Box::new(syn::Type::Verbatim(quote! { ::cursed::ErrCallback })),
+                ty: Box::new(syn::Type::Verbatim(quote! { ::cffi::ErrCallback })),
             });
         }
 
@@ -373,7 +373,7 @@ impl Function {
                         ))
                     }
                 };
-                quote! { <#return_marshaler as ::cursed::ReturnType>::Foreign }
+                quote! { <#return_marshaler as ::cffi::ReturnType>::Foreign }
             })
 
         // sig.extend(ret);
@@ -383,7 +383,7 @@ impl Function {
 
         sig.extend(if let Some(ty) = ty {
             if self.has_callback {
-                quote! { (#foreign_params, __return: ::cursed::RetCallback<#ty>) }
+                quote! { (#foreign_params, __return: ::cffi::RetCallback<#ty>) }
             } else {
                 quote! { (#foreign_params) -> #ty }
             }
@@ -449,7 +449,7 @@ impl Function {
 
                 let throw = gen_throw(
                     Some(quote! {
-                        <#return_marshaler as ::cursed::ReturnType>::foreign_default()
+                        <#return_marshaler as ::cffi::ReturnType>::foreign_default()
                     }),
                     self.has_callback,
                 );

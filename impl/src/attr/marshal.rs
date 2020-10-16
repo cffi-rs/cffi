@@ -32,7 +32,7 @@ impl Debug for MarshalAttr {
 impl MarshalAttr {
     pub fn self_type() -> Option<MarshalAttr> {
         Some(MarshalAttr {
-            path: syn::parse2(quote! { ::cursed::BoxMarshaler }).unwrap(),
+            path: syn::parse2(quote! { ::cffi::BoxMarshaler }).unwrap(),
             types: vec![],
         })
     }

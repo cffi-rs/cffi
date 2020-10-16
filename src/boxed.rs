@@ -28,7 +28,7 @@ use super::{FromForeign, InputType, ReturnType, ToForeign};
 /// ## Example
 ///
 /// ```rust
-/// use cursed::{BoxMarshaler, FromForeign, ToForeign};
+/// use cffi::{BoxMarshaler, FromForeign, ToForeign};
 ///
 /// struct Something {
 ///     data: Vec<u8>

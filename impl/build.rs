@@ -48,7 +48,7 @@ macro_rules! type_array {
 
 fn main() {
     let default_marshalers: HashMap<Type, syn::Path> = map_marshalers![
-        bool => ::cursed::BoolMarshaler,
+        bool => ::cffi::BoolMarshaler,
     ];
 
     let path = Path::new(&env::var("OUT_DIR").unwrap()).join("codegen.rs");

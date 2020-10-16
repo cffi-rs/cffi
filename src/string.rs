@@ -59,6 +59,6 @@ impl<'a> FromForeign<Slice<u8>, String> for StringMarshaler {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn cursed_string_free(slice: Slice<u8>) {
-    crate::vec::cursed_vec_free(slice.cast());
+pub unsafe extern "C" fn cffi_string_free(slice: Slice<u8>) {
+    crate::vec::cffi_vec_free(slice.cast());
 }
