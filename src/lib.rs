@@ -16,6 +16,14 @@ mod unit;
 mod vec;
 mod vec_ref;
 
+/// Exported functions for consumption via C API
+pub mod ffi {
+    pub use super::{
+        string::cffi_string_free,
+        vec::cffi_vec_free
+    };
+}
+
 #[cfg(feature = "url")]
 pub use self::url::UrlMarshaler;
 
