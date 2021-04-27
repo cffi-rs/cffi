@@ -5,10 +5,12 @@ pub struct BoolMarshaler;
 
 impl InputType for BoolMarshaler {
     type Foreign = u8;
+    type ForeignTraitObject = ();
 }
 
 impl ReturnType for BoolMarshaler {
     type Foreign = u8;
+    type ForeignTraitObject = ();
 
     fn foreign_default() -> u8 {
         0

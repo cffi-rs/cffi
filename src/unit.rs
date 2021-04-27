@@ -4,10 +4,12 @@ pub struct UnitMarshaler;
 
 impl InputType for UnitMarshaler {
     type Foreign = ();
+    type ForeignTraitObject = ();
 }
 
 impl ReturnType for UnitMarshaler {
     type Foreign = ();
+    type ForeignTraitObject = ();
 
     #[inline(always)]
     fn foreign_default() -> () {

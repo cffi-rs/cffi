@@ -8,6 +8,7 @@ pub struct BoxRefMarshaler<T>(PhantomData<T>);
 
 impl<T> InputType for BoxRefMarshaler<T> {
     type Foreign = *mut T;
+    type ForeignTraitObject = ();
 }
 
 // impl<'a, T> FromForeign<*mut Box<T>, &'a Box<T>> for BoxRefMarshaler<T> {

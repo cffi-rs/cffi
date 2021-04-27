@@ -8,10 +8,12 @@ pub struct VecMarshaler<T>(PhantomData<T>);
 
 impl<T> InputType for VecMarshaler<T> {
     type Foreign = Slice<T>;
+    type ForeignTraitObject = ();
 }
 
 impl<T> ReturnType for VecMarshaler<T> {
     type Foreign = Slice<T>;
+    type ForeignTraitObject = ();
 
     fn foreign_default() -> Self::Foreign {
         Slice {

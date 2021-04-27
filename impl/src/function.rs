@@ -43,18 +43,30 @@ fn gen_try_not_null(
 }
 
 fn gen_foreign(
-    marshaler: &syn::Path,
+    marshaler: &MarshalAttr,
     name: &syn::Pat,
     out_ty: &syn::Type,
     out_marshaler: Option<&syn::Path>,
     ret_ty: Option<&syn::Type>,
     has_callback: bool,
 ) -> TokenStream {
+    let marshaler_path = &marshaler.path;
+    let marshal_ty = marshaler.first_type();
+
     let block = gen_try_not_null(
-        quote! { unsafe { #marshaler::from_foreign(#name) } },
+        if marshal_ty.as_ref().map(is_trait_object).unwrap_or(false) {
+            quote! { unsafe {
+                let #name = std::mem::transmute::<_, *const (#marshal_ty)>(#name);
+                #marshaler_path::from_foreign(#name)
+            } }
+        } else {
+            quote! { unsafe { #marshaler_path::from_foreign(#name) } }
+        },
         ret_ty.filter(|_| !has_callback).map(|ty| {
             if crate::is_passthrough_type(ty) {
                 quote! { <#ty>::default() }
+            } else if is_trait_object(ty) {
+                quote! { <#out_marshaler as ::cffi::ReturnType>::foreign_default_trait_object() }
             } else {
                 quote! { <#out_marshaler as ::cffi::ReturnType>::foreign_default() }
             }
@@ -226,6 +238,13 @@ mod c {
     }
 }
 
+fn is_trait_object(ty: &syn::Type) -> bool {
+    match ty {
+        syn::Type::TraitObject(_) => true,
+        _ => false,
+    }
+}
+
 impl Function {
     pub fn new(
         name: syn::Ident,
@@ -263,12 +282,23 @@ impl Function {
             // }
             if let Some(marshaler) = mapping.marshaler.as_ref() {
                 let path = &marshaler.path;
-                in_type.ty = Box::new(syn::Type::Verbatim(
-                    quote! { <#path as ::cffi::InputType>::Foreign },
-                ));
+                let is_trait_object = marshaler
+                    .first_type()
+                    .map(|x| is_trait_object(&x))
+                    .unwrap_or(false);
+
+                in_type.ty = if is_trait_object {
+                    Box::new(syn::Type::Verbatim(
+                        quote! { <#path as ::cffi::InputType>::ForeignTraitObject },
+                    ))
+                } else {
+                    Box::new(syn::Type::Verbatim(
+                        quote! { <#path as ::cffi::InputType>::Foreign },
+                    ))
+                };
 
                 let foreign = gen_foreign(
-                    &marshaler.path,
+                    &marshaler,
                     &name,
                     &out_type,
                     return_marshaler,
@@ -282,7 +312,10 @@ impl Function {
                     <::cffi::BoxMarshaler::<#out_type> as ::cffi::InputType>::Foreign
                 }));
 
-                let box_marshaler = syn::parse2(quote! { ::cffi::BoxMarshaler::<#out_type> })?;
+                let box_marshaler = MarshalAttr {
+                    path: syn::parse2(quote! { ::cffi::BoxMarshaler::<#out_type> })?,
+                    types: vec![],
+                };
                 let foreign = gen_foreign(
                     &box_marshaler,
                     &name,
@@ -373,7 +406,18 @@ impl Function {
                         ))
                     }
                 };
-                quote! { <#return_marshaler as ::cffi::ReturnType>::Foreign }
+
+                let is_trait_object = self
+                    .fn_marshal_attr
+                    .as_ref()
+                    .and_then(|x| x.first_type())
+                    .map(|x| is_trait_object(&x))
+                    .unwrap_or(false);
+                if is_trait_object {
+                    quote! { <#return_marshaler as ::cffi::ReturnType>::ForeignTraitObject }
+                } else {
+                    quote! { <#return_marshaler as ::cffi::ReturnType>::Foreign }
+                }
             })
 
         // sig.extend(ret);
@@ -447,9 +491,22 @@ impl Function {
                     }
                 };
 
+                let is_trait_object = self
+                    .fn_marshal_attr
+                    .as_ref()
+                    .and_then(|x| x.first_type())
+                    .map(|x| is_trait_object(&x))
+                    .unwrap_or(false);
+
                 let throw = gen_throw(
-                    Some(quote! {
-                        <#return_marshaler as ::cffi::ReturnType>::foreign_default()
+                    Some(if is_trait_object {
+                        quote! {
+                            <#return_marshaler as ::cffi::ReturnType>::foreign_default_trait_object()
+                        }
+                    } else {
+                        quote! {
+                            <#return_marshaler as ::cffi::ReturnType>::foreign_default()
+                        }
                     }),
                     self.has_callback,
                 );
@@ -462,6 +519,20 @@ impl Function {
                                 Ok(v) => __return(v),
                                 Err(e) => #throw
                             }
+                        }
+                    });
+                } else if is_trait_object {
+                    let dyn_ty = self
+                        .fn_marshal_attr
+                        .as_ref()
+                        .and_then(|x| x.first_type())
+                        .unwrap();
+
+                    inner_block.extend(quote! {
+                        let result = #call_name(#foreign_args);
+                        match #return_marshaler::to_foreign(result) {
+                            Ok(v) => unsafe { cffi::trait_object!(v: (#dyn_ty)) },
+                            Err(e) => #throw
                         }
                     });
                 } else {
@@ -480,14 +551,10 @@ impl Function {
     }
 
     pub fn to_token_stream(&self) -> Result<TokenStream, syn::Error> {
-        // log::debug!("{:#?}", self);
-
         let sig = self.build_signature()?;
         let inner_block = self.build_inner_block()?;
 
         Ok(quote! {
-            // static ty_name: &'static str = std::any::type_name::<String>();
-            // #[cthulhu::invoke(send_help = ty_name)]
             #sig {
                 #inner_block
             }

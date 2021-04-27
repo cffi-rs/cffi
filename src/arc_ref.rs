@@ -2,16 +2,19 @@ use std::error::Error;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
+use crate::TraitObject;
+
 use super::null_ptr_error;
 use super::{FromForeign, InputType};
 
-pub struct ArcRefMarshaler<T>(PhantomData<T>);
+pub struct ArcRefMarshaler<T: ?Sized>(PhantomData<T>);
 
-impl<T> InputType for ArcRefMarshaler<T> {
+impl<T: ?Sized> InputType for ArcRefMarshaler<T> {
     type Foreign = *const T;
+    type ForeignTraitObject = TraitObject<T>;
 }
 
-impl<'a, T> FromForeign<*const T, Arc<T>> for ArcRefMarshaler<T> {
+impl<'a, T: ?Sized> FromForeign<*const T, Arc<T>> for ArcRefMarshaler<T> {
     type Error = Box<dyn Error>;
 
     #[inline(always)]

@@ -55,10 +55,12 @@ pub struct BoxMarshaler<T: ?Sized>(PhantomData<T>);
 
 impl<T> InputType for BoxMarshaler<T> {
     type Foreign = *const T;
+    type ForeignTraitObject = ();
 }
 
 impl<T> ReturnType for BoxMarshaler<T> {
     type Foreign = *const T;
+    type ForeignTraitObject = ();
 
     fn foreign_default() -> Self::Foreign {
         std::ptr::null()

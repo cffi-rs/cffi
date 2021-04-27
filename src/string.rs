@@ -7,10 +7,12 @@ pub struct StringMarshaler;
 
 impl InputType for StringMarshaler {
     type Foreign = Slice<u8>;
+    type ForeignTraitObject = ();
 }
 
 impl ReturnType for StringMarshaler {
     type Foreign = Slice<u8>;
+    type ForeignTraitObject = ();
 
     #[inline(always)]
     fn foreign_default() -> Self::Foreign {

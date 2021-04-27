@@ -14,11 +14,13 @@ pub struct PathBufMarshaler;
 #[cfg(unix)]
 impl InputType for PathBufMarshaler {
     type Foreign = Slice<u8>;
+    type ForeignTraitObject = ();
 }
 
 #[cfg(unix)]
 impl ReturnType for PathBufMarshaler {
     type Foreign = Slice<u8>;
+    type ForeignTraitObject = ();
 
     #[inline(always)]
     fn foreign_default() -> Self::Foreign {

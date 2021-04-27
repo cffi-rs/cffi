@@ -8,10 +8,12 @@ pub struct StrMarshaler<'a>(&'a PhantomData<()>);
 
 impl InputType for StrMarshaler<'_> {
     type Foreign = Slice<u8>;
+    type ForeignTraitObject = ();
 }
 
 impl ReturnType for StrMarshaler<'_> {
     type Foreign = Slice<u8>;
+    type ForeignTraitObject = ();
 
     #[inline(always)]
     fn foreign_default() -> Self::Foreign {

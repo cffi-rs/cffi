@@ -3,24 +3,28 @@ use std::error::Error;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
+use crate::{ToForeignTraitObject, TraitObject};
+
 use super::null_ptr_error;
 use super::{FromForeign, InputType, ReturnType, ToForeign};
 
 pub struct ArcMarshaler<T: ?Sized>(PhantomData<T>);
 
-impl<T> InputType for ArcMarshaler<T> {
+impl<T: ?Sized> InputType for ArcMarshaler<T> {
     type Foreign = *const T;
+    type ForeignTraitObject = ();
 }
 
-impl<T> ReturnType for ArcMarshaler<T> {
+impl<T: ?Sized> ReturnType for ArcMarshaler<T> {
     type Foreign = *const T;
+    type ForeignTraitObject = TraitObject<T>;
 
     fn foreign_default() -> Self::Foreign {
-        std::ptr::null_mut()
+        panic!("Unrepresentable!");
     }
 }
 
-impl<T> ToForeign<Arc<T>, *const T> for ArcMarshaler<T> {
+impl<T: ?Sized> ToForeign<Arc<T>, *const T> for ArcMarshaler<T> {
     type Error = Infallible;
 
     #[inline(always)]
@@ -41,7 +45,7 @@ impl<T> ToForeign<Arc<T>, *const T> for ArcMarshaler<T> {
     }
 }
 
-impl<T> FromForeign<*const T, Arc<T>> for ArcMarshaler<T> {
+impl<T: ?Sized> FromForeign<*const T, Arc<T>> for ArcMarshaler<T> {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
