@@ -15,10 +15,12 @@ pub struct PathBufMarshaler;
 
 impl InputType for PathBufMarshaler {
     type Foreign = Slice<u16>;
+    type ForeignTraitObject = ();
 }
 
 impl ReturnType for PathBufMarshaler {
     type Foreign = Slice<u16>;
+    type ForeignTraitObject = ();
 
     #[inline(always)]
     fn foreign_default() -> Self::Foreign {
