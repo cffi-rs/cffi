@@ -2,6 +2,7 @@ use std::convert::Infallible;
 use std::error::Error;
 use std::marker::PhantomData;
 use std::sync::Arc;
+use std::mem::MaybeUninit;
 
 use crate::{ToForeignTraitObject, TraitObject};
 
@@ -20,7 +21,18 @@ impl<T: ?Sized> ReturnType for ArcMarshaler<T> {
     type ForeignTraitObject = TraitObject<T>;
 
     fn foreign_default() -> Self::Foreign {
-        panic!("Unrepresentable!");
+        // This is not UB so long as it is only called when T is not a trait object. This is currently guaranteed by the generator.
+        // Whether or not this is UB when T is a trait object is still an open question, see https://github.com/rust-lang/unsafe-code-guidelines/issues/166
+        // (Although if they do make it UB they will completely break many assumptions with FFI, so they better not)
+        unsafe { MaybeUninit::zeroed().assume_init() }
+    }
+
+    fn foreign_default_trait_object() -> Self::ForeignTraitObject {
+        TraitObject {
+            data: std::ptr::null_mut(),
+            vtable: std::ptr::null_mut(),
+            ty: PhantomData
+        }
     }
 }
 
