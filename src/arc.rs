@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 use std::mem::MaybeUninit;
 
-use crate::{ToForeignTraitObject, TraitObject};
+use crate::TraitObject;
 
 use super::null_ptr_error;
 use super::{FromForeign, InputType, ReturnType, ToForeign};
