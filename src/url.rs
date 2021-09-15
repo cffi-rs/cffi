@@ -7,10 +7,12 @@ pub struct UrlMarshaler;
 
 impl InputType for UrlMarshaler {
     type Foreign = Slice<u8>;
+    type ForeignTraitObject = ();
 }
 
 impl ReturnType for UrlMarshaler {
     type Foreign = Slice<u8>;
+    type ForeignTraitObject = ();
 
     #[inline(always)]
     fn foreign_default() -> Self::Foreign {
