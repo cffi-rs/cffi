@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use quote::quote;
+use syn::{Pat, PatIdent};
 
 pub trait ForeignArgExt {
     fn to_foreign_param(&self) -> Result<syn::PatType, syn::Error>;
@@ -23,16 +24,29 @@ impl ForeignArgExt for syn::PatType {
 
 impl ForeignArgExt for syn::Receiver {
     fn to_foreign_param(&self) -> Result<syn::PatType, syn::Error> {
+        let ident = syn::parse2(quote! { __handle }).unwrap();
         Ok(syn::PatType {
             attrs: vec![],
-            pat: syn::parse2(quote! { __handle }).unwrap(),
+            pat: Box::new(Pat::Ident(PatIdent {
+                attrs: vec![],
+                by_ref: None,
+                mutability: None,
+                ident,
+                subpat: None,
+            })),
             colon_token: <syn::Token![:]>::default(),
             ty: Box::new(syn::parse2(quote! { *const ::std::ffi::c_void }).unwrap()),
         })
     }
 
     fn to_foreign_arg(&self) -> Result<syn::Pat, syn::Error> {
-        Ok(syn::parse2(quote! { __handle }).unwrap())
+        Ok(Pat::Ident(PatIdent {
+            attrs: vec![],
+            by_ref: None,
+            mutability: None,
+            ident: syn::parse2(quote! { __handle }).unwrap(),
+            subpat: None,
+        }))
     }
 }
 

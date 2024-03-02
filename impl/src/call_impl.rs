@@ -1,4 +1,4 @@
-use heck::SnakeCase;
+use heck::ToSnakeCase as _;
 use log::debug;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -52,7 +52,7 @@ pub(crate) fn call_with_impl(
         .items
         .iter_mut()
         .filter_map(|impl_item| match impl_item {
-            syn::ImplItem::Method(method) => match (
+            syn::ImplItem::Fn(method) => match (
                 &method.vis,
                 method.sig.asyncness,
                 method.sig.unsafety,

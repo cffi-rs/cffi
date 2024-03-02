@@ -1,8 +1,8 @@
 use std::convert::Infallible;
 use std::error::Error;
 use std::marker::PhantomData;
-use std::sync::Arc;
 use std::mem::MaybeUninit;
+use std::sync::Arc;
 
 use crate::TraitObject;
 
@@ -31,7 +31,7 @@ impl<T: ?Sized> ReturnType for ArcMarshaler<T> {
         TraitObject {
             data: std::ptr::null_mut(),
             vtable: std::ptr::null_mut(),
-            ty: PhantomData
+            ty: PhantomData,
         }
     }
 }

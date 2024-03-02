@@ -1,6 +1,7 @@
 use log::debug;
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::token::Paren;
 
 use super::{function::Function, function::InnerFn, return_type::ReturnType};
 use crate::attr::marshal::MarshalAttr;
@@ -30,8 +31,11 @@ pub fn call_with_function(
         pound_token: <syn::Token![#]>::default(),
         style: syn::AttrStyle::Outer,
         bracket_token: syn::token::Bracket::default(),
-        path: syn::parse2(quote! { inline }).unwrap(),
-        tokens: quote! { (always) },
+        meta: syn::Meta::List(syn::MetaList {
+            path: syn::parse2(quote! { inline }).unwrap(),
+            delimiter: syn::MacroDelimiter::Paren(Paren::default()),
+            tokens: quote! { (always) },
+        }),
     };
     fn_item.attrs.push(attr);
 

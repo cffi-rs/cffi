@@ -66,7 +66,7 @@ fn main() {
             &format!("\"{}\"", quote! { #value }.to_string()),
         );
     }
-    map.build(&mut file).unwrap();
+    write!(&mut file, "{}", map.build()).unwrap();
     write!(&mut file, ";\n").unwrap();
 
     let types: Vec<Type> = type_array![

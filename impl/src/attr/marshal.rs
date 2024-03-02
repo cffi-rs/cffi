@@ -111,18 +111,13 @@ impl MarshalAttr {
     }
 
     pub fn from_attribute(attr: syn::Attribute) -> Result<Option<MarshalAttr>, syn::Error> {
-        match attr.path.segments.first() {
-            Some(v) => {
-                if v.ident.to_string() != "marshal" {
-                    return Ok(None);
-                }
-            }
-            None => {
-                return Ok(None);
-            }
+        if !attr.meta.path().is_ident("marshal") {
+            return Ok(None);
         }
 
-        let marshal_ty: syn::Type = match syn::parse2(attr.tokens) {
+        let list = attr.meta.require_list()?;
+
+        let marshal_ty: syn::Type = match syn::parse2(list.tokens.clone()) {
             Ok(v) => v,
             Err(e) => return Err(e),
         };

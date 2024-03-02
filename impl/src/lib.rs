@@ -1,10 +1,9 @@
 extern crate proc_macro;
 
 use ctor::ctor;
-use darling::FromMeta;
+use darling::{ast::NestedMeta, Error, FromMeta};
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::AttributeArgs;
 
 mod attr;
 mod call_fn;
@@ -22,7 +21,12 @@ pub fn marshal(
     params: proc_macro::TokenStream,
     function: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    let params = syn::parse_macro_input!(params as AttributeArgs);
+    let params = match NestedMeta::parse_meta_list(params.into()) {
+        Ok(v) => v,
+        Err(e) => {
+            return TokenStream::from(Error::from(e).write_errors()).into();
+        }
+    };
 
     let params = match InvokeParams::from_list(&params) {
         Ok(v) => v,
