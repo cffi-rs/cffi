@@ -14,21 +14,21 @@ repository = "https://github.com/cffi-rs/cffi"
 proc-macro = true
 
 [dependencies]
-syn = "2.0.52"
-quote = "1.0.7"
-proc-macro2 = "1.0.24"
-darling = "0.20.8"
-heck = "0.4.1"
-ctor = "0.2.7"
-log = "0.4.11"
+syn = "2.0.106"
+quote = "1.0.41"
+proc-macro2 = "1.0.101"
+darling = "0.21.3"
+heck = "0.5.0"
+ctor = "0.5.0"
+log = "0.4.28"
 pretty_env_logger = "0.5.0"
-phf = "0.11.2"
+phf = "0.13.1"
 
 [dev-dependencies]
 assert_tokens_eq = { git = "https://github.com/killercup/assert_tokens_eq" }
 
 [build-dependencies]
-phf_codegen = "0.11.2"
+phf_codegen = "0.13.1"
 syn = { version = "2.0.52", features = ["full", "extra-traits"] }
 quote = "1.0.2"
 proc-macro2 = "1.0.4"

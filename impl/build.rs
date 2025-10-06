@@ -61,9 +61,10 @@ fn main() {
     .unwrap();
     let mut map = phf_codegen::Map::new();
     for (key, value) in default_marshalers.iter() {
+        let v = format!("\"{}\"", quote! { #value }.to_string());
         map.entry(
             quote! { #key }.to_string(),
-            &format!("\"{}\"", quote! { #value }.to_string()),
+            v,
         );
     }
     write!(&mut file, "{}", map.build()).unwrap();
