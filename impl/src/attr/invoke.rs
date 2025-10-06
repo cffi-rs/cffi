@@ -21,9 +21,7 @@ impl FromAttributes for InvokeParams {
             }
 
             let metas = match &attr.meta {
-                syn::Meta::List(ml) => {
-                    NestedMeta::parse_meta_list(ml.tokens.clone())?
-                }
+                syn::Meta::List(ml) => NestedMeta::parse_meta_list(ml.tokens.clone())?,
                 x @ syn::Meta::Path(_) => vec![NestedMeta::Meta(x.clone())],
                 x @ syn::Meta::NameValue(_) => vec![NestedMeta::Meta(x.clone())],
             };
@@ -59,7 +57,7 @@ impl FromAttributes for InvokeParams {
                             }
                         }
                         syn::Meta::List(x) => unreachable!("A list?? HOW"),
-                    }
+                    },
                     NestedMeta::Lit(_) => unreachable!("A LIT??"),
                 }
             }

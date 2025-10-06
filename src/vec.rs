@@ -58,7 +58,6 @@ impl<T> FromForeign<Slice<T>, Vec<T>> for VecMarshaler<T> {
     }
 }
 
-
 impl<T> ToForeign<Result<Vec<T>, Box<dyn Error>>, Slice<T>> for VecMarshaler<T> {
     type Error = Box<dyn Error>;
 
@@ -67,7 +66,6 @@ impl<T> ToForeign<Result<Vec<T>, Box<dyn Error>>, Slice<T>> for VecMarshaler<T> 
         local.map(|x| VecMarshaler::to_foreign(x).unwrap())
     }
 }
-
 
 #[no_mangle]
 pub unsafe extern "C" fn cffi_vec_free(slice: Slice<libc::c_void>) {

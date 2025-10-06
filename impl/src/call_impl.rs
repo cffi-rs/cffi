@@ -101,8 +101,7 @@ pub(crate) fn call_with_impl(
             //     })
             //     .collect::<Result<Vec<_>, _>>()?;
 
-            let invoke_params = 
-                InvokeParams::from_attributes(&attrs)?;
+            let invoke_params = InvokeParams::from_attributes(&attrs)?;
 
             // let invoke_params = InvokeParams::from_list(
             //     &attrs

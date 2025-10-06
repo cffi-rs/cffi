@@ -30,7 +30,7 @@ pub use self::str::StrMarshaler;
 pub use self::vec::VecMarshaler;
 pub use arc::ArcMarshaler;
 pub use arc_ref::ArcRefMarshaler;
-pub use box_ref::BoxRefMarshaler;
+pub use box_ref::{BoxMutRefMarshaler, BoxRefMarshaler};
 pub use boxed::BoxMarshaler;
 pub use copy::CopyMarshaler;
 pub use string::StringMarshaler;
