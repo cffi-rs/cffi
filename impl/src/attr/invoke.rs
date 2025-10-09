@@ -1,4 +1,4 @@
-use darling::{ast::NestedMeta, FromAttributes, FromMeta};
+use darling::{FromAttributes, FromMeta, ast::NestedMeta};
 use quote::ToTokens;
 
 #[derive(Debug, FromMeta, Default)]

@@ -114,7 +114,7 @@ impl<T> FromForeign<*const T, Box<T>> for BoxMarshaler<T> {
             return Err(null_ptr_error());
         }
 
-        Ok(Box::from_raw(foreign as *mut _))
+        Ok(unsafe { Box::from_raw(foreign as *mut _) })
     }
 }
 

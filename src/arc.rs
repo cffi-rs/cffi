@@ -72,7 +72,7 @@ impl<T: ?Sized> FromForeign<*const T, Arc<T>> for ArcMarshaler<T> {
             return Err(null_ptr_error());
         }
 
-        Ok(Arc::from_raw(foreign as *const _))
+        Ok(unsafe { Arc::from_raw(foreign as *const _) })
     }
 }
 

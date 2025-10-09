@@ -23,7 +23,7 @@ impl<'a, T: ?Sized> FromForeign<*const T, Arc<T>> for ArcRefMarshaler<T> {
             return Err(null_ptr_error());
         }
 
-        let arc = Arc::from_raw(foreign);
+        let arc = unsafe { Arc::from_raw(foreign) };
         let cloned = Arc::clone(&arc);
         let _x = Arc::into_raw(arc);
 

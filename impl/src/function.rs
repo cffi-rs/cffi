@@ -4,7 +4,7 @@ use std::fmt::{self, Debug};
 use std::path::Path;
 use syn::punctuated::Punctuated;
 
-use crate::attr::{marshal::MarshalAttr, Mapping};
+use crate::attr::{Mapping, marshal::MarshalAttr};
 use crate::ext::*;
 use crate::ptr_type::PtrType;
 use crate::return_type::ReturnType;
@@ -423,7 +423,7 @@ impl Function {
         } = self;
 
         let mut sig = quote! {
-            #[no_mangle]
+            #[unsafe(no_mangle)]
             pub extern "C" fn #name
         };
 
@@ -431,7 +431,6 @@ impl Function {
             Some(if crate::is_passthrough_type(&ty) {
                 quote! { #ty }
             } else {
-                log::debug!("what the fuck? {:?}", self.fn_marshal_attr);
                 let return_marshaler = match ty.resolve_marshaler(self.fn_marshal_attr.as_ref()) {
                     Some(v) => v,
                     None => {
@@ -441,7 +440,7 @@ impl Function {
                                 "no marshaler found for return type {}",
                                 quote! { #ty }.to_string()
                             ),
-                        ))
+                        ));
                     }
                 };
 
@@ -457,8 +456,6 @@ impl Function {
                     quote! { <#return_marshaler as ::cffi::ReturnType>::Foreign }
                 }
             })
-
-        // sig.extend(ret);
         } else {
             None
         };
@@ -525,7 +522,7 @@ impl Function {
                                 "no marshaler found for return type {}",
                                 quote! { #ty }.to_string()
                             ),
-                        ))
+                        ));
                     }
                 };
 

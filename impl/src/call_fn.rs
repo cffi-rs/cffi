@@ -4,8 +4,8 @@ use quote::quote;
 use syn::token::Paren;
 
 use super::{function::Function, function::InnerFn, return_type::ReturnType};
-use crate::attr::marshal::MarshalAttr;
 use crate::attr::SignatureExt;
+use crate::attr::marshal::MarshalAttr;
 
 pub fn call_with_function(
     return_marshaler: Option<syn::Path>,

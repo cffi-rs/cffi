@@ -6,7 +6,7 @@ authors = [
   "Brendan Molloy <brendan@bbqsrc.net>",
   "Pascal Hertleif <pascal@technocreatives.com>"
 ]
-edition = "2021"
+edition = "2024"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/cffi-rs/cffi"
 
@@ -15,7 +15,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 cffi-impl = { version = "=0.2.0-dev", path = "./impl" }
-libc = "0.2.176"
+libc = "0.2.177"
 log = "0.4.28"
 url = { version = "2.5.7", optional = true }
 

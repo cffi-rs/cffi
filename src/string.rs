@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 use std::error::Error;
 
-use super::{vec::VecMarshaler, FromForeign, InputType, ReturnType, Slice, ToForeign};
+use super::{FromForeign, InputType, ReturnType, Slice, ToForeign, vec::VecMarshaler};
 
 pub struct StringMarshaler;
 
@@ -55,12 +55,14 @@ impl<'a> FromForeign<Slice<u8>, String> for StringMarshaler {
 
     #[inline(always)]
     unsafe fn from_foreign(key: Slice<u8>) -> Result<String, Self::Error> {
-        VecMarshaler::from_foreign(key)
-            .and_then(|vec| String::from_utf8(vec).map_err(|err| Box::new(err) as _))
+        unsafe {
+            VecMarshaler::from_foreign(key)
+                .and_then(|vec| String::from_utf8(vec).map_err(|err| Box::new(err) as _))
+        }
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn cffi_string_free(slice: Slice<u8>) {
-    crate::vec::cffi_vec_free(slice.cast());
+    unsafe { crate::vec::cffi_vec_free(slice.cast()) };
 }

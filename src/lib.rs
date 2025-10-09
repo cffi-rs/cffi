@@ -103,7 +103,7 @@ pub struct Slice<T: ?Sized> {
 
 impl<T> Slice<T> {
     unsafe fn cast<U>(self) -> Slice<U> {
-        std::mem::transmute::<Slice<T>, Slice<U>>(self)
+        unsafe { std::mem::transmute::<Slice<T>, Slice<U>>(self) }
     }
 }
 

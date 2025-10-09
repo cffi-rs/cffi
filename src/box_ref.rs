@@ -32,7 +32,7 @@ impl<'a, T> FromForeign<*mut T, &'a T> for BoxRefMarshaler<T> {
             return Err(null_ptr_error());
         }
 
-        Ok(&*foreign)
+        Ok(unsafe { &*foreign })
     }
 }
 
@@ -51,6 +51,6 @@ impl<'a, T> FromForeign<*mut T, &'a mut T> for BoxMutRefMarshaler<T> {
             return Err(null_ptr_error());
         }
 
-        Ok(&mut *foreign)
+        Ok(unsafe { &mut *foreign })
     }
 }

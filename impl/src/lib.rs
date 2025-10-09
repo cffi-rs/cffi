@@ -1,7 +1,7 @@
 extern crate proc_macro;
 
 use ctor::ctor;
-use darling::{ast::NestedMeta, Error, FromMeta};
+use darling::{Error, FromMeta, ast::NestedMeta};
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -10,7 +10,6 @@ mod call_fn;
 mod call_impl;
 mod ext;
 mod function;
-mod ptr_type;
 mod return_type;
 
 use attr::invoke::InvokeParams;
@@ -33,20 +32,14 @@ pub fn marshal(
         Err(err) => return err.write_errors().into(),
     };
 
-    let has_return = params.return_marshaler.is_some();
-
     let result = match call_with(params, function.into()) {
         Ok(tokens) => tokens.into(),
         Err(err) => {
             return proc_macro::TokenStream::from(
                 syn::Error::new(err.span(), err.to_string()).to_compile_error(),
-            )
+            );
         }
     };
-
-    if has_return {
-        println!("{}", result);
-    }
 
     result
 }

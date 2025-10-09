@@ -89,13 +89,13 @@ impl ForeignTypeExt for syn::Type {
                 return Err(syn::Error::new_spanned(
                     self,
                     "Tuple parameters not supported",
-                ))
+                ));
             }
             _ => {
                 return Err(syn::Error::new_spanned(
                     self,
                     "Unknown parameters not supported",
-                ))
+                ));
             }
         }
 

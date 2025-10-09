@@ -50,7 +50,7 @@ impl<'a, T> FromForeign<Slice<T>, &'a [T]> for VecRefMarshaler<T> {
             return Err(null_ptr_error());
         }
 
-        let slice = std::slice::from_raw_parts(slice.data, slice.len);
+        let slice = unsafe { std::slice::from_raw_parts(slice.data, slice.len) };
         Ok(slice)
     }
 }

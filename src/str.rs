@@ -45,7 +45,7 @@ impl<'a> FromForeign<Slice<u8>, &'a str> for StrMarshaler<'a> {
             return Err(null_ptr_error());
         }
 
-        let r = std::slice::from_raw_parts(slice.data as _, slice.len);
+        let r = unsafe { std::slice::from_raw_parts(slice.data as _, slice.len) };
         std::str::from_utf8(r).map_err(|e| Box::new(e) as _)
     }
 }
@@ -59,7 +59,7 @@ impl<'a> FromForeign<Slice<u8>, Option<&'a str>> for StrMarshaler<'a> {
             return Ok(None);
         }
 
-        let r = std::slice::from_raw_parts(slice.data as _, slice.len);
+        let r = unsafe { std::slice::from_raw_parts(slice.data as _, slice.len) };
         std::str::from_utf8(r)
             .map(Some)
             .map_err(|e| Box::new(e) as _)

@@ -51,8 +51,7 @@ impl<T> FromForeign<Slice<T>, Vec<T>> for VecMarshaler<T> {
             return Err(null_ptr_error());
         }
 
-        // let ptr = unsafe { std::mem::transmute::<*const c_void, *mut [T]>(ptr) };
-        let vec = Vec::from_raw_parts(ptr.data, ptr.len, ptr.len);
+        let vec = unsafe { Vec::from_raw_parts(ptr.data, ptr.len, ptr.len) };
 
         Ok(vec)
     }
@@ -67,7 +66,7 @@ impl<T> ToForeign<Result<Vec<T>, Box<dyn Error>>, Slice<T>> for VecMarshaler<T> 
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn cffi_vec_free(slice: Slice<libc::c_void>) {
-    Vec::from_raw_parts(slice.data, slice.len, slice.len);
+    unsafe { Vec::from_raw_parts(slice.data, slice.len, slice.len) };
 }

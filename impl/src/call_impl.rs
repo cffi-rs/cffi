@@ -3,12 +3,12 @@ use darling::{FromAttributes, FromMeta};
 use heck::ToSnakeCase as _;
 use log::debug;
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 
 use super::{function::Function, function::InnerFn, return_type::ReturnType};
+use crate::attr::SignatureExt;
 use crate::attr::invoke::InvokeParams;
 use crate::attr::marshal::MarshalAttr;
-use crate::attr::SignatureExt;
 
 pub(crate) fn call_with_impl(
     prefix: Option<String>,

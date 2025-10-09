@@ -40,7 +40,7 @@ impl FromForeign<Slice<u8>, PathBuf> for PathBufMarshaler {
             return Err(null_ptr_error());
         }
 
-        let slice: &[u8] = std::slice::from_raw_parts(foreign.data, foreign.len);
+        let slice: &[u8] = unsafe { std::slice::from_raw_parts(foreign.data, foreign.len) };
         let os_str = std::ffi::OsStr::from_bytes(slice);
         Ok(Path::new(os_str).to_path_buf())
     }
