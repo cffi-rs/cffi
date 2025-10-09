@@ -1,12 +1,10 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::fmt::{self, Debug};
-use std::path::Path;
 use syn::punctuated::Punctuated;
 
 use crate::attr::{Mapping, marshal::MarshalAttr};
 use crate::ext::*;
-use crate::ptr_type::PtrType;
 use crate::return_type::ReturnType;
 
 fn gen_throw(fallback: Option<TokenStream>, no_return: bool) -> TokenStream {
@@ -164,6 +162,11 @@ impl TypeMarshalExt for syn::ReturnType {
             syn::ReturnType::Type(_, ty) => ty.resolve_marshaler(marshaler_attr),
         }
     }
+}
+
+pub enum PtrType {
+    Const,
+    Mut,
 }
 
 impl TypeMarshalExt for syn::Type {
