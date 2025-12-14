@@ -50,7 +50,7 @@ pub fn call_with_function(
         fn_item.sig.inputs.clone(),
         &mappings,
         return_type,
-        InnerFn::FunctionBody(fn_item),
+        InnerFn::FunctionBody(Box::new(fn_item)),
         fn_marshal_attr,
         callback,
     )?;

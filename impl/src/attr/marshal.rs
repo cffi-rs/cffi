@@ -47,7 +47,7 @@ impl MarshalAttr {
     }
 
     pub fn from_defaults_by_type(ty: &syn::Type) -> Option<MarshalAttr> {
-        crate::default_marshaler(&ty).map(|x| MarshalAttr {
+        crate::default_marshaler(ty).map(|x| MarshalAttr {
             path: x.clone(),
             types: vec![],
         })
@@ -55,7 +55,7 @@ impl MarshalAttr {
 
     pub fn from_defaults_by_return_type(ty: &syn::ReturnType) -> Option<MarshalAttr> {
         match ty {
-            syn::ReturnType::Type(_, ty) => Self::from_defaults_by_type(&*ty),
+            syn::ReturnType::Type(_, ty) => Self::from_defaults_by_type(ty),
             _ => None,
         }
     }
@@ -105,8 +105,6 @@ impl MarshalAttr {
             ));
         }
 
-        // TODO: not this, not here.
-
         Ok(None)
     }
 
@@ -116,17 +114,12 @@ impl MarshalAttr {
         }
 
         if let Ok(list) = attr.meta.require_list() {
-            let marshal_ty: syn::Type = match syn::parse2(list.tokens.clone()) {
-                Ok(v) => v,
-                Err(e) => return Err(e),
-            };
+            let marshal_ty: syn::Type = syn::parse2(list.tokens.clone())?;
 
             match marshal_ty {
                 syn::Type::Path(path) => Self::from_path(path.path),
                 syn::Type::BareFn(bare_fn) => Self::from_bare_fn(bare_fn),
-                e => {
-                    return Err(syn::Error::new_spanned(e, "Must be a path"));
-                }
+                e => Err(syn::Error::new_spanned(e, "Must be a path")),
             }
         } else {
             unreachable!("Shouldn't be here")

@@ -35,7 +35,7 @@ use super::{FromForeign, InputType, ReturnType, ToForeign};
 /// }
 ///
 /// fn demo() {
-///     let something = Something { data: vec![1, 3, 55] };
+///     let something = Box::new(Something { data: vec![1, 3, 55] });
 ///
 ///     // BoxMarshaler::to_foreign is Infallible
 ///     let ptr: *const Something = BoxMarshaler::to_foreign(something).unwrap();
@@ -43,7 +43,7 @@ use super::{FromForeign, InputType, ReturnType, ToForeign};
 ///     /* send `ptr` over ffi, process it in some way, etc */
 ///
 ///     // This isn't infallible though, checks for null pointers.
-///     let boxed: Box<Something> = match BoxMarshaler::from_foreign(ptr) {
+///     let boxed: Box<Something> = match unsafe { BoxMarshaler::from_foreign(ptr) } {
 ///         Ok(v) => v,
 ///         Err(e) => panic!("!")
 ///     };
@@ -86,7 +86,7 @@ impl<T: ?Sized> ToForeign<Result<Box<T>, Box<dyn Error>>, *const T> for BoxMarsh
 
     #[inline(always)]
     fn to_foreign(local: Result<Box<T>, Box<dyn Error>>) -> Result<*const T, Self::Error> {
-        local.and_then(|x| Ok(Box::into_raw(x) as *const _ as *const _))
+        local.map(|x| Box::into_raw(x) as *const _ as *const _)
     }
 }
 

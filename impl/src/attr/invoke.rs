@@ -56,7 +56,7 @@ impl FromAttributes for InvokeParams {
                                 result.callback = true;
                             }
                         }
-                        syn::Meta::List(x) => unreachable!("A list?? HOW"),
+                        syn::Meta::List(_) => unreachable!("A list?? HOW"),
                     },
                     NestedMeta::Lit(_) => unreachable!("A LIT??"),
                 }
@@ -65,29 +65,4 @@ impl FromAttributes for InvokeParams {
 
         Ok(result)
     }
-}
-
-impl InvokeParams {
-    // pub fn from_attributes(attr: syn::Attribute) -> Result<Option<Self>, syn::Error> {
-    //     if !attr.meta.path().is_ident("marshal") {
-    //         return Ok(None);
-    //     }
-
-    //     if let Ok(list) = attr.meta.require_list() {
-    //         let marshal_ty: syn::Type = match syn::parse2(list.tokens.clone()) {
-    //             Ok(v) => v,
-    //             Err(e) => return Err(e),
-    //         };
-
-    //         match marshal_ty {
-    //             syn::Type::Path(path) => Self::from_path(path.path),
-    //             syn::Type::BareFn(bare_fn) => Self::from_bare_fn(bare_fn),
-    //             e => {
-    //                 return Err(syn::Error::new_spanned(e, "Must be a path"));
-    //             }
-    //         }
-    //     } else {
-    //         unreachable!("Shouldn't be here")
-    //     }
-    // }
 }

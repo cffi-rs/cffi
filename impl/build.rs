@@ -7,20 +7,6 @@ use std::path::Path;
 use quote::quote;
 use syn::Type;
 
-// macro_rules! map_types {
-//     [$($rust:ty => $c:ty,)*] => {{
-//         let mut map = std::collections::HashMap::<Type, Type>::new();
-//         $(map.insert(
-//             syn::parse2(quote!{ $rust })
-//                 .expect(concat!("cannot parse", stringify!($rust), "as type")),
-
-//             syn::parse2(quote!{ $c })
-//                 .expect(concat!("cannot parse", stringify!($c), "as type")),
-//         );)*
-//         map
-//     }}
-// }
-
 macro_rules! map_marshalers {
     [$($rust:ty => $c:ty,)*] => {{
         let mut map = std::collections::HashMap::<Type, syn::Path>::new();
@@ -61,11 +47,11 @@ fn main() {
     .unwrap();
     let mut map = phf_codegen::Map::new();
     for (key, value) in default_marshalers.iter() {
-        let v = format!("\"{}\"", quote! { #value }.to_string());
+        let v = format!("\"{}\"", quote! { #value });
         map.entry(quote! { #key }.to_string(), v);
     }
     write!(&mut file, "{}", map.build()).unwrap();
-    write!(&mut file, ";\n").unwrap();
+    writeln!(&mut file, ";").unwrap();
 
     let types: Vec<Type> = type_array![
         (),
@@ -87,9 +73,9 @@ fn main() {
         char,
     ];
 
-    write!(
+    writeln!(
         &mut file,
-        "static PASSTHROUGH_TYPES: &[&str] = &[\"{}\"];\n",
+        "static PASSTHROUGH_TYPES: &[&str] = &[\"{}\"];",
         types
             .into_iter()
             .map(|x| quote! { #x }.to_string())

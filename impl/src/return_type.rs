@@ -28,7 +28,7 @@ impl ReturnType {
         let foreign = match (marshal_attr.and_then(|x| x.return_type()), &local) {
             (Some(ty), _) => ty,
             (_, syn::ReturnType::Type(x, ty)) => {
-                syn::ReturnType::Type(x.clone(), Box::new(ty.to_foreign_type()?))
+                syn::ReturnType::Type(*x, Box::new(ty.to_foreign_type()?))
             }
             (_, x) => x.clone(),
         };
@@ -49,8 +49,4 @@ impl ReturnType {
             _ => None,
         }
     }
-
-    // pub fn foreign_ptr_type(&self) -> Option<PtrType> {
-    //     PtrType::from(self.foreign_type().as_ref())
-    // }
 }

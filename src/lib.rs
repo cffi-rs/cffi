@@ -72,6 +72,8 @@ pub trait ToForeignTraitObject<Local: ?Sized, Foreign: ?Sized> {
 
 pub trait FromForeign<Foreign, Local>: Sized {
     type Error;
+    /// # Safety
+    /// The foreign value must be valid and properly initialized.
     unsafe fn from_foreign(_: Foreign) -> Result<Local, Self::Error>;
 }
 
@@ -79,21 +81,6 @@ pub trait FromForeign<Foreign, Local>: Sized {
 pub fn null_ptr_error() -> Box<io::Error> {
     Box::new(io::Error::new(io::ErrorKind::InvalidData, "null pointer"))
 }
-
-// Magical catch-all implementation for `Result<Local, Error>`.
-// impl<T, Foreign, Local> ToForeign<Result<Local, T::Error>, Foreign> for T
-// where
-//     T: ToForeign<Local, Foreign>,
-// {
-//     type Error = T::Error;
-
-//     fn to_foreign(result: Result<Local, T::Error>) -> Result<Foreign, Self::Error> {
-//         match result {
-//             Ok(v) => <Self as ToForeign<Local, Foreign>>::to_foreign(v),
-//             Err(e) => Err(e),
-//         }
-//     }
-// }
 
 #[repr(C)]
 pub struct Slice<T: ?Sized> {

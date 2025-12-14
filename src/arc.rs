@@ -81,6 +81,6 @@ impl<T: ?Sized> ToForeign<Result<Arc<T>, Box<dyn Error>>, *const T> for ArcMarsh
 
     #[inline(always)]
     fn to_foreign(local: Result<Arc<T>, Box<dyn Error>>) -> Result<*const T, Self::Error> {
-        local.and_then(|x| Ok(Arc::into_raw(x) as *const _))
+        local.map(|x| Arc::into_raw(x) as *const _)
     }
 }

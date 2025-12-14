@@ -13,8 +13,7 @@ impl ForeignArgExt for syn::PatType {
         Ok(syn::PatType {
             ty: Box::new(self.ty.to_foreign_type()?),
             ..self.clone()
-        }
-        .into())
+        })
     }
 
     fn to_foreign_arg(&self) -> Result<syn::Pat, syn::Error> {
@@ -122,10 +121,7 @@ pub trait ErrorExt<T> {
 impl<T> ErrorExt<T> for Result<T, syn::Error> {
     fn context(self, msg: impl Display) -> Self {
         match self {
-            Err(err) => Err(syn::Error::new(
-                err.span(),
-                format!("{}: {}", msg, err.to_string()),
-            )),
+            Err(err) => Err(syn::Error::new(err.span(), format!("{}: {}", msg, err))),
             x => x,
         }
     }

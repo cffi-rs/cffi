@@ -1,8 +1,7 @@
-use darling::ast::NestedMeta;
-use darling::{FromAttributes, FromMeta};
+use darling::FromAttributes;
 use heck::ToSnakeCase as _;
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::quote;
 use tracing::debug;
 
 use super::{function::Function, function::InnerFn, return_type::ReturnType};
@@ -22,14 +21,14 @@ pub(crate) fn call_with_impl(
 
     if let Some(defaultness) = item.defaultness {
         return Err(syn::Error::new_spanned(
-            &defaultness,
+            defaultness,
             "Does not support specialised impls",
         ));
     }
 
     if let Some(unsafety) = item.unsafety {
         return Err(syn::Error::new_spanned(
-            &unsafety,
+            unsafety,
             "Does not support unsafe impls",
         ));
     }
@@ -48,7 +47,7 @@ pub(crate) fn call_with_impl(
         ));
     }
 
-    let self_ty = &*item.self_ty;
+    let self_ty: &syn::Type = &item.self_ty;
     let invoke_prefix = prefix.unwrap_or_else(|| "".into());
     let prefix = format!("{}_{}", invoke_prefix, quote! { #self_ty }).to_snake_case();
     let pub_methods = item
@@ -75,7 +74,7 @@ pub(crate) fn call_with_impl(
             let c_ident: syn::Ident =
                 syn::parse_str(&format!("{}_{}", prefix, &ident).to_snake_case()).unwrap();
 
-            let mappings = x.sig.drain_mappings(Some(&*self_ty))?;
+            let mappings = x.sig.drain_mappings(Some(self_ty))?;
 
             debug!("mappings {:?}", mappings);
             debug!("impl fn {}", quote! { #fn_path });
@@ -86,30 +85,7 @@ pub(crate) fn call_with_impl(
 
             debug!("attrs {:?}", attrs);
 
-            // let mut idents = attrs
-            //     .iter()
-            //     .filter_map(|item| {
-            //         debug!("attr {}", quote! { #item });
-            //         match MarshalAttr::from_attribute(item.clone()) {
-            //             Ok(None) => {
-            //                 x.attrs.push(item.clone());
-            //                 return None;
-            //             }
-            //             Ok(Some(v)) => Some(Ok(v)),
-            //             Err(e) => return Some(Err(e)),
-            //         }
-            //     })
-            //     .collect::<Result<Vec<_>, _>>()?;
-
             let invoke_params = InvokeParams::from_attributes(&attrs)?;
-
-            // let invoke_params = InvokeParams::from_list(
-            //     &attrs
-            //         .into_iter()
-            //         .map(|x| NestedMeta::Meta(x.meta))
-            //         .collect::<Vec<_>>(),
-            // )?;
-
             debug!("invoke_params {:?}", invoke_params);
             let syn::Signature {
                 inputs: params,

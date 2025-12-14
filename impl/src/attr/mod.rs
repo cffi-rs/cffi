@@ -19,7 +19,7 @@ impl Mapping {
 
         let path = match parent {
             syn::Type::Path(path) => path,
-            e => return Err(syn::Error::new_spanned(&e, "not a valid self type path")),
+            e => return Err(syn::Error::new_spanned(e, "not a valid self type path")),
         };
 
         let output_type = match (reference, mutability) {
@@ -53,19 +53,14 @@ fn drain_marshal_attrs(attrs: &mut Vec<syn::Attribute>) -> Result<Option<Marshal
         .filter_map(|item| match MarshalAttr::from_attribute(item.clone()) {
             Ok(None) => {
                 attrs.push(item);
-                return None;
+                None
             }
             Ok(Some(v)) => Some(Ok(v)),
-            Err(e) => return Some(Err(e)),
+            Err(e) => Some(Err(e)),
         })
-        .collect::<Result<Vec<_>, _>>();
+        .collect::<Result<Vec<_>, _>>()?;
 
-    let mut idents = match idents {
-        Ok(v) => v,
-        Err(e) => return Err(e),
-    };
-
-    Ok(idents.pop())
+    Ok(idents.into_iter().last())
 }
 
 impl AttrExt for syn::PatType {
@@ -97,33 +92,31 @@ impl SignatureExt for syn::Signature {
     ) -> Result<Vec<Mapping>, syn::Error> {
         self.inputs
             .iter_mut()
-            .filter_map(|mut input| {
+            .map(|input| {
                 // Check if we're a self-type, and short-circuit
-                // TODO: this should use marshal_attr like normal typed fields
-                let input = match &mut input {
+                let input = match input {
                     syn::FnArg::Receiver(receiver) => {
                         if let Some(parent_type) = parent_type {
-                            return Some(Mapping::self_type(receiver, parent_type));
+                            return Mapping::self_type(receiver, parent_type);
                         } else {
-                            return Some(Err(syn::Error::new_spanned(
-                                &receiver,
+                            return Err(syn::Error::new_spanned(
+                                receiver,
                                 "no self type found; using invoke wrong?",
-                            )));
+                            ));
                         }
                     }
                     syn::FnArg::Typed(t) => t,
                 };
 
-                let marshaler = match input.drain_marshal_attrs() {
-                    Ok(v) => v.or_else(|| MarshalAttr::from_defaults_by_type(&input.ty)),
-                    Err(e) => return Some(Err(e)),
-                };
+                let marshaler = input
+                    .drain_marshal_attrs()?
+                    .or_else(|| MarshalAttr::from_defaults_by_type(&input.ty));
 
-                Some(Ok(Mapping {
+                Ok(Mapping {
                     output_type: *input.ty.clone(),
                     marshaler,
-                }))
+                })
             })
-            .collect::<Result<Vec<_>, _>>()
+            .collect()
     }
 }

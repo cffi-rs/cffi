@@ -22,7 +22,7 @@ pub fn marshal(
     let params = match NestedMeta::parse_meta_list(params.into()) {
         Ok(v) => v,
         Err(e) => {
-            return TokenStream::from(Error::from(e).write_errors()).into();
+            return Error::from(e).write_errors().into();
         }
     };
 
@@ -31,16 +31,12 @@ pub fn marshal(
         Err(err) => return err.write_errors().into(),
     };
 
-    let result = match call_with(params, function.into()) {
+    match call_with(params, function.into()) {
         Ok(tokens) => tokens.into(),
-        Err(err) => {
-            return proc_macro::TokenStream::from(
-                syn::Error::new(err.span(), err.to_string()).to_compile_error(),
-            );
-        }
-    };
-
-    result
+        Err(err) => syn::Error::new(err.span(), err.to_string())
+            .to_compile_error()
+            .into(),
+    }
 }
 
 fn call_with(invoke_params: InvokeParams, item: TokenStream) -> Result<TokenStream, syn::Error> {

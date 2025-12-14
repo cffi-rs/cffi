@@ -65,6 +65,6 @@ impl<E> ToForeign<Result<PathBuf, E>, Slice<u8>> for PathBufMarshaler {
 
     #[inline(always)]
     fn to_foreign(input: Result<PathBuf, E>) -> Result<Slice<u8>, Self::Error> {
-        input.and_then(|x| Ok(PathBufMarshaler::to_foreign(x).unwrap()))
+        input.map(|x| PathBufMarshaler::to_foreign(x).unwrap())
     }
 }

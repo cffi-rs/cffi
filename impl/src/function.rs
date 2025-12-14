@@ -77,7 +77,7 @@ fn gen_foreign(
 }
 
 pub enum InnerFn {
-    FunctionBody(syn::ItemFn),
+    FunctionBody(Box<syn::ItemFn>),
     FunctionCall(syn::Path),
 }
 
@@ -135,8 +135,6 @@ impl std::fmt::Debug for Function {
 }
 
 trait TypeMarshalExt {
-    fn pointer_type(&self) -> Option<PtrType>;
-
     fn resolve_marshaler<'a>(
         &self,
         marshaler_attr: Option<&'a MarshalAttr>,
@@ -144,42 +142,19 @@ trait TypeMarshalExt {
 }
 
 impl TypeMarshalExt for syn::ReturnType {
-    fn pointer_type(&self) -> Option<PtrType> {
-        match self {
-            syn::ReturnType::Default => None,
-            syn::ReturnType::Type(_, ty) if crate::is_passthrough_type(&ty) => None,
-            syn::ReturnType::Type(_, ty) => ty.pointer_type(),
-        }
-    }
-
     fn resolve_marshaler<'a>(
         &self,
         marshaler_attr: Option<&'a MarshalAttr>,
     ) -> Option<&'a syn::Path> {
         match &self {
             syn::ReturnType::Default => None,
-            syn::ReturnType::Type(_, ty) if crate::is_passthrough_type(&ty) => None,
+            syn::ReturnType::Type(_, ty) if crate::is_passthrough_type(ty) => None,
             syn::ReturnType::Type(_, ty) => ty.resolve_marshaler(marshaler_attr),
         }
     }
 }
 
-pub enum PtrType {
-    Const,
-    Mut,
-}
-
 impl TypeMarshalExt for syn::Type {
-    fn pointer_type(&self) -> Option<PtrType> {
-        match self {
-            syn::Type::Ptr(ty) => Some(match ty.const_token {
-                Some(_) => PtrType::Const,
-                None => PtrType::Mut,
-            }),
-            _ => None,
-        }
-    }
-
     fn resolve_marshaler<'a>(
         &self,
         marshaler_attr: Option<&'a MarshalAttr>,
@@ -188,90 +163,8 @@ impl TypeMarshalExt for syn::Type {
     }
 }
 
-trait PatExt {
-    fn ident(&self) -> Option<syn::Ident>;
-}
-
-impl PatExt for syn::Pat {
-    fn ident(&self) -> Option<syn::Ident> {
-        match self {
-            syn::Pat::Ident(ident) => Some(ident.ident.clone()),
-            syn::Pat::Verbatim(ident) => Some(syn::parse2(ident.clone()).unwrap()),
-            _ => None,
-        }
-    }
-}
-
-mod c {
-    use std::borrow::Cow;
-
-    use crate::is_passthrough_type;
-
-    use super::*;
-
-    fn c_type(ty: Option<syn::Type>) -> Cow<'static, str> {
-        if let Some(ty) = ty {
-            // if is_passthrough_type(&ty) {
-            //     match ty {
-            //         syn::Type::Path(x) => {
-            //         }
-            //         _ => return Cow::Borrowed("TODO(passthrough type)"),
-            //     }
-            // }
-
-            match ty.pointer_type() {
-                Some(PtrType::Const) => return Cow::Borrowed("const void*"),
-                Some(PtrType::Mut) => return Cow::Borrowed("void*"),
-                None => {}
-            }
-
-            match &ty {
-                syn::Type::Path(x) => {
-                    if is_passthrough_type(&ty) {
-                        return Cow::Owned(x.path.get_ident().unwrap().to_string());
-                    }
-                    return Cow::Owned(format!("struct {}", x.path.segments.last().unwrap().ident));
-                }
-                syn::Type::Verbatim(x) => unreachable!("wtf"),
-                _ => todo!(),
-            }
-        }
-
-        Cow::Borrowed("void")
-    }
-
-    pub fn to_string(function: &Function) -> String {
-        // Get return type for C
-        let return_type = c_type(function.return_type.foreign_type());
-
-        let params = function
-            .foreign_params
-            .iter()
-            .map(|fn_arg| {
-                let name = fn_arg.pat.ident().map(|x| x.to_string()).unwrap();
-
-                if name == "__exception" {
-                    "void (*exception)(const char*)".into()
-                } else {
-                    let ty = c_type(Some((*fn_arg.ty).clone()));
-                    format!("{} {}", ty, name)
-                }
-            })
-            .collect::<Vec<_>>()
-            .join(", ");
-
-        format!(
-            "extern {} {}({}); \n{:#?}",
-            return_type, function.name, params, function
-        )
-    }
-}
-
 fn is_trait_object(ty: &syn::Type) -> bool {
-    match ty {
-        syn::Type::TraitObject(_) => true,
-        _ => false,
-    }
+    matches!(ty, syn::Type::TraitObject(_))
 }
 
 impl Function {
@@ -306,13 +199,9 @@ impl Function {
                 .to_foreign_param()
                 .context("failed to convert Rust type to FFI type")?;
 
-            // if let Some(in_ty_override) = marshaler.as_ref().and_then(|m| m.types.first().cloned())
-            // {
-            //     in_type.ty = Box::new(in_ty_override);
-            // }
             if let Some(marshaler) = mapping.marshaler.as_ref() {
                 let path = &marshaler.path;
-                assert!(path.segments.len() > 0);
+                assert!(!path.segments.is_empty());
                 let is_trait_object = marshaler
                     .first_type()
                     .map(|x| is_trait_object(&x))
@@ -329,16 +218,16 @@ impl Function {
                 };
 
                 let foreign = gen_foreign(
-                    &marshaler,
+                    marshaler,
                     &name,
-                    &out_type,
+                    out_type,
                     return_marshaler,
                     return_type.foreign_type().as_ref(),
                     has_callback,
                 );
                 from_foreigns.extend(foreign);
                 has_exceptions = true;
-            } else if !crate::is_passthrough_type(&out_type) {
+            } else if !crate::is_passthrough_type(out_type) {
                 in_type.ty = Box::new(syn::Type::Verbatim(quote! {
                     <::cffi::BoxMarshaler::<#out_type> as ::cffi::InputType>::Foreign
                 }));
@@ -350,7 +239,7 @@ impl Function {
                 let foreign = gen_foreign(
                     &box_marshaler,
                     &name,
-                    &out_type,
+                    out_type,
                     return_marshaler,
                     return_type.foreign_type().as_ref(),
                     has_callback,
@@ -377,45 +266,19 @@ impl Function {
             });
         }
 
-        let function = Function {
+        Ok(Function {
             name,
             original_params: params,
             foreign_params,
             foreign_args,
             return_type,
-            return_marshaler: return_marshaler.map(|x| x.clone()),
+            return_marshaler: return_marshaler.cloned(),
             from_foreigns,
             inner_fn,
             fn_marshal_attr,
             has_exceptions,
             has_callback,
-        };
-
-        // let cffi_path = Path::new(&std::env::var("OUT_DIR").unwrap()).join("../../../cffi");
-        // std::fs::create_dir_all(&cffi_path).unwrap();
-        // std::fs::write(
-        //     &cffi_path
-        //         .join(function.name.to_string())
-        //         .with_extension("h"),
-        //     c::to_string(&function),
-        // )
-        // .unwrap();
-
-        // if crate::is_exporting() {
-        //     use fd_lock::{FdLock, FdLockGuard};
-        //     let mut lockable_file = FdLock::new(
-        //         std::fs::OpenOptions::new()
-        //             .append(true)
-        //             .create_new(true)
-        //             .open(crate::json_output_path())
-        //             .unwrap(),
-        //     );
-        //     let mut output = lockable_file.lock().unwrap();
-        //     serde_json::to_writer(&mut output).unwrap();
-        //     output.write_all(&[b"\n"]).unwrap();
-        // }
-
-        Ok(function)
+        })
     }
 
     fn build_signature(&self) -> Result<TokenStream, syn::Error> {
@@ -431,7 +294,7 @@ impl Function {
         };
 
         let ty = if let syn::ReturnType::Type(_, ty) = &self.return_type.local {
-            Some(if crate::is_passthrough_type(&ty) {
+            Some(if crate::is_passthrough_type(ty) {
                 quote! { #ty }
             } else {
                 let return_marshaler = match ty.resolve_marshaler(self.fn_marshal_attr.as_ref()) {
@@ -439,10 +302,7 @@ impl Function {
                     None => {
                         return Err(syn::Error::new_spanned(
                             ty,
-                            format!(
-                                "no marshaler found for return type {}",
-                                quote! { #ty }.to_string()
-                            ),
+                            format!("no marshaler found for return type {}", quote! { #ty }),
                         ));
                     }
                 };
@@ -504,7 +364,7 @@ impl Function {
             syn::ReturnType::Default => {
                 inner_block.extend(quote! { #call_name(#foreign_args); });
             }
-            syn::ReturnType::Type(_, ty) if crate::is_passthrough_type(&ty) => {
+            syn::ReturnType::Type(_, ty) if crate::is_passthrough_type(ty) => {
                 if self.has_callback {
                     inner_block.extend(quote! {
                         if let Some(__return) = __return {
@@ -521,10 +381,7 @@ impl Function {
                     None => {
                         return Err(syn::Error::new_spanned(
                             ty,
-                            format!(
-                                "no marshaler found for return type {}",
-                                quote! { #ty }.to_string()
-                            ),
+                            format!("no marshaler found for return type {}", quote! { #ty }),
                         ));
                     }
                 };

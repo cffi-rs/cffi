@@ -34,7 +34,7 @@ impl ToForeign<Result<String, Box<dyn Error>>, Slice<u8>> for StringMarshaler {
 
     #[inline(always)]
     fn to_foreign(result: Result<String, Box<dyn Error>>) -> Result<Slice<u8>, Self::Error> {
-        result.and_then(|v| Ok(StringMarshaler::to_foreign(v).unwrap()))
+        result.map(|v| StringMarshaler::to_foreign(v).unwrap())
     }
 }
 
@@ -50,7 +50,7 @@ impl ToForeign<Option<String>, Slice<u8>> for StringMarshaler {
     }
 }
 
-impl<'a> FromForeign<Slice<u8>, String> for StringMarshaler {
+impl FromForeign<Slice<u8>, String> for StringMarshaler {
     type Error = Box<dyn Error>;
 
     #[inline(always)]
@@ -62,6 +62,8 @@ impl<'a> FromForeign<Slice<u8>, String> for StringMarshaler {
     }
 }
 
+/// # Safety
+/// The slice must have been created by this library and not already freed.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cffi_string_free(slice: Slice<u8>) {
     unsafe { crate::vec::cffi_vec_free(slice.cast()) };

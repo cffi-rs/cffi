@@ -32,11 +32,6 @@ impl<T> ToForeign<Vec<T>, Slice<T>> for VecMarshaler<T> {
         let data = vec.as_mut_ptr();
         std::mem::forget(vec);
 
-        // tracing::debug!("Vec len: {}", vec.len());
-        // let raw = Box::into_raw(vec.into_boxed_slice());
-        // tracing::debug!("Raw len: {}", unsafe { (*raw).len() });
-        // tracing::debug!("???: {}", super::vec_ref::VecRefMarshaler::from_foreign(raw).unwrap().len());
-
         let raw = Slice { data, len };
         tracing::debug!("Ptr: {:?}", raw);
         Ok(raw)
@@ -66,6 +61,8 @@ impl<T> ToForeign<Result<Vec<T>, Box<dyn Error>>, Slice<T>> for VecMarshaler<T> 
     }
 }
 
+/// # Safety
+/// The slice must have been created by this library and not already freed.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cffi_vec_free(slice: Slice<libc::c_void>) {
     unsafe { Vec::from_raw_parts(slice.data, slice.len, slice.len) };

@@ -12,9 +12,7 @@ impl ReturnType for UnitMarshaler {
     type ForeignTraitObject = ();
 
     #[inline(always)]
-    fn foreign_default() -> () {
-        ()
-    }
+    fn foreign_default() {}
 }
 
 impl<E> ToForeign<Result<(), E>, ()> for UnitMarshaler {
