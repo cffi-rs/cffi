@@ -45,7 +45,7 @@ impl<'a, T> FromForeign<Slice<T>, &'a [T]> for VecRefMarshaler<T> {
     type Error = Box<dyn Error>;
 
     unsafe fn from_foreign(slice: Slice<T>) -> Result<&'a [T], Self::Error> {
-        log::debug!("vec ref ptr: {:?}", slice);
+        tracing::debug!("vec ref ptr: {:?}", slice);
         if slice.data.is_null() {
             return Err(null_ptr_error());
         }

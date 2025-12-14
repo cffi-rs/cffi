@@ -72,7 +72,7 @@ impl<T> ToForeign<Box<T>, *const T> for BoxMarshaler<T> {
 
     #[inline(always)]
     fn to_foreign(local: Box<T>) -> Result<*const T, Self::Error> {
-        log::debug!(
+        tracing::debug!(
             "<BoxMarshaler<{ty}> as ToForeign<{ty}, {o}>>::to_foreign",
             ty = std::any::type_name::<T>(),
             o = "*const T"
@@ -104,7 +104,7 @@ impl<T> FromForeign<*const T, Box<T>> for BoxMarshaler<T> {
 
     #[inline(always)]
     unsafe fn from_foreign(foreign: *const T) -> Result<Box<T>, Self::Error> {
-        log::debug!(
+        tracing::debug!(
             "<BoxMarshaler<{ty}> as FromForeign<*const T, T>>::from_foreign({:?})",
             foreign,
             ty = std::any::type_name::<T>()
@@ -123,7 +123,7 @@ impl<T> FromForeign<*const T, Box<T>> for BoxMarshaler<T> {
 
 //     #[inline(always)]
 //     unsafe fn from_foreign(foreign: *mut T) -> Result<Box<T>, Self::Error> {
-//         log::debug!("<BoxMarshaler<{ty}> as FromForeign<*mut {ty}, &'a {ty}>>::from_foreign({:?})",
+//         tracing::debug!("<BoxMarshaler<{ty}> as FromForeign<*mut {ty}, &'a {ty}>>::from_foreign({:?})",
 //             foreign,
 //             ty = std::any::type_name::<T>()
 //         );

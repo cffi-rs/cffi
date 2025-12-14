@@ -32,13 +32,13 @@ impl<T> ToForeign<Vec<T>, Slice<T>> for VecMarshaler<T> {
         let data = vec.as_mut_ptr();
         std::mem::forget(vec);
 
-        // log::debug!("Vec len: {}", vec.len());
+        // tracing::debug!("Vec len: {}", vec.len());
         // let raw = Box::into_raw(vec.into_boxed_slice());
-        // log::debug!("Raw len: {}", unsafe { (*raw).len() });
-        // log::debug!("???: {}", super::vec_ref::VecRefMarshaler::from_foreign(raw).unwrap().len());
+        // tracing::debug!("Raw len: {}", unsafe { (*raw).len() });
+        // tracing::debug!("???: {}", super::vec_ref::VecRefMarshaler::from_foreign(raw).unwrap().len());
 
         let raw = Slice { data, len };
-        log::debug!("Ptr: {:?}", raw);
+        tracing::debug!("Ptr: {:?}", raw);
         Ok(raw)
     }
 }

@@ -294,7 +294,7 @@ impl Function {
         let mut has_exceptions = false;
 
         for (i, param) in params.iter().enumerate() {
-            log::debug!("{i} {:?}", param);
+            tracing::debug!("{i} {:?}", param);
             let mapping = &mappings[i];
             let out_type = &mapping.output_type;
             let _marshaler = &mapping.marshaler;

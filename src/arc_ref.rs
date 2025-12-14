@@ -36,7 +36,7 @@ impl<'a, T: ?Sized> FromForeign<*const T, Arc<T>> for ArcRefMarshaler<T> {
 
 //     #[inline(always)]
 //     unsafe fn from_foreign(foreign: *const T) -> Result<&'a mut T, Self::Error> {
-//         log::debug!(
+//         tracing::debug!(
 //             "<ArcMarshaler<{ty}> as FromForeign<*const T, &'a mut T>>::from_foreign({:?})",
 //             foreign,
 //             ty = std::any::type_name::<T>()

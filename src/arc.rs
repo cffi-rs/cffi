@@ -41,7 +41,7 @@ impl<T: ?Sized> ToForeign<Arc<T>, *const T> for ArcMarshaler<T> {
 
     #[inline(always)]
     fn to_foreign(local: Arc<T>) -> Result<*const T, Self::Error> {
-        log::debug!(
+        tracing::debug!(
             "<ArcMarshaler<{ty}> as ToForeign<{ty}, {o}>>::to_foreign",
             ty = std::any::type_name::<T>(),
             o = "*const c_void"
@@ -62,7 +62,7 @@ impl<T: ?Sized> FromForeign<*const T, Arc<T>> for ArcMarshaler<T> {
 
     #[inline(always)]
     unsafe fn from_foreign(foreign: *const T) -> Result<Arc<T>, Self::Error> {
-        log::debug!(
+        tracing::debug!(
             "<ArcMarshaler<{ty}> as FromForeign<*const std::ffi::c_void, T>>::from_foreign({:?})",
             foreign,
             ty = std::any::type_name::<T>()

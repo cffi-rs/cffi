@@ -14,13 +14,28 @@ repository = "https://github.com/cffi-rs/cffi"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-cffi-impl = { version = "=0.2.0-dev", path = "./impl" }
-libc = "0.2.177"
-log = "0.4.28"
-url = { version = "2.5.7", optional = true }
+cffi-impl = { workspace = true }
+libc = { workspace = true }
+log = { workspace = true }
+tracing = { workspace = true }
+url = { workspace = true, optional = true }
 
 [features]
 default = []
 
 [workspace]
 members = ["impl"]
+
+[workspace.dependencies]
+cffi-impl = { version = "=0.2.0-dev", path = "./impl" }
+libc = "0.2.177"
+log = "0.4.28"
+tracing = "0.1.43"
+url = "2.5.7"
+syn = { version = "2.0.111", features = ["full", "extra-traits"] }
+quote = "1.0.42"
+proc-macro2 = "1.0.103"
+darling = "0.21.3"
+heck = "0.5.0"
+phf = "0.13.1"
+phf_codegen = "0.13.1"

@@ -1,9 +1,9 @@
 use darling::ast::NestedMeta;
 use darling::{FromAttributes, FromMeta};
 use heck::ToSnakeCase as _;
-use log::debug;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
+use tracing::debug;
 
 use super::{function::Function, function::InnerFn, return_type::ReturnType};
 use crate::attr::SignatureExt;

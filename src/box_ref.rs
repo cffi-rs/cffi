@@ -22,7 +22,7 @@ impl<'a, T> FromForeign<*mut T, &'a T> for BoxRefMarshaler<T> {
 
     #[inline(always)]
     unsafe fn from_foreign(foreign: *mut T) -> Result<&'a T, Self::Error> {
-        log::debug!(
+        tracing::debug!(
             "<BoxMarshaler<{ty}> as FromForeign<*mut Box<T>, &'a mut Box<T>>>::from_foreign({:?})",
             foreign,
             ty = std::any::type_name::<T>()
@@ -41,7 +41,7 @@ impl<'a, T> FromForeign<*mut T, &'a mut T> for BoxMutRefMarshaler<T> {
 
     #[inline(always)]
     unsafe fn from_foreign(foreign: *mut T) -> Result<&'a mut T, Self::Error> {
-        log::debug!(
+        tracing::debug!(
             "<BoxMutMarshaler<{ty}> as FromForeign<*mut Box<T>, &'a mut Box<T>>>::from_foreign({:?})",
             foreign,
             ty = std::any::type_name::<T>()

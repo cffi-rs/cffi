@@ -1,7 +1,7 @@
-use log::debug;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::token::Paren;
+use tracing::debug;
 
 use super::{function::Function, function::InnerFn, return_type::ReturnType};
 use crate::attr::SignatureExt;
