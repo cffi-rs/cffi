@@ -76,31 +76,31 @@ impl MarshalAttr {
         Ok(Some(MarshalAttr { path, types }))
     }
 
-    fn from_bare_fn(bare_fn: syn::TypeBareFn) -> Result<Option<MarshalAttr>, syn::Error> {
-        if bare_fn.lifetimes.is_some() {
+    fn from_fn_ptr(fn_ptr: syn::TypeFnPtr) -> Result<Option<MarshalAttr>, syn::Error> {
+        if fn_ptr.lifetimes.is_some() {
             return Err(syn::Error::new_spanned(
-                bare_fn,
+                fn_ptr,
                 "Marshal fn may not have lifetimes",
             ));
         }
 
-        if bare_fn.unsafety.is_some() {
+        if fn_ptr.unsafety.is_some() {
             return Err(syn::Error::new_spanned(
-                bare_fn,
+                fn_ptr,
                 "Marshal fn may not have unsafety",
             ));
         }
 
-        if bare_fn.abi.is_some() {
+        if fn_ptr.abi.is_some() {
             return Err(syn::Error::new_spanned(
-                bare_fn,
+                fn_ptr,
                 "Marshal fn may not have abi",
             ));
         }
 
-        if bare_fn.variadic.is_some() {
+        if fn_ptr.variadic.is_some() {
             return Err(syn::Error::new_spanned(
-                bare_fn,
+                fn_ptr,
                 "Marshal fn may not have variadic",
             ));
         }
@@ -118,7 +118,7 @@ impl MarshalAttr {
 
             match marshal_ty {
                 syn::Type::Path(path) => Self::from_path(path.path),
-                syn::Type::BareFn(bare_fn) => Self::from_bare_fn(bare_fn),
+                syn::Type::FnPtr(fn_ptr) => Self::from_fn_ptr(fn_ptr),
                 e => Err(syn::Error::new_spanned(e, "Must be a path")),
             }
         } else {

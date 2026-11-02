@@ -33,7 +33,7 @@ fn gen_zero_value(
     has_callback: bool,
 ) -> Option<TokenStream> {
     ret_ty.filter(|_| !has_callback).map(|ty| {
-        if matches!(ty, syn::Type::BareFn(_)) {
+        if matches!(ty, syn::Type::FnPtr(_)) {
             // A function pointer is never NULL, so there is no zero value to return.
             quote! { ::std::process::abort() }
         } else if crate::is_passthrough_type(ty) {

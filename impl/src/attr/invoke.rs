@@ -59,6 +59,7 @@ impl FromAttributes for InvokeParams {
                         syn::Meta::List(_) => unreachable!("A list?? HOW"),
                     },
                     NestedMeta::Lit(_) => unreachable!("A LIT??"),
+                    NestedMeta::NameValueInvalidExpr(invalid) => return Err(invalid.error),
                 }
             }
         }

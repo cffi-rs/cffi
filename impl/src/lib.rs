@@ -76,7 +76,7 @@ pub(crate) fn default_marshaler(ty: &syn::Type) -> Option<syn::Path> {
 
 pub(crate) fn is_passthrough_type(ty: &syn::Type) -> bool {
     match ty {
-        syn::Type::BareFn(bare_fn) => bare_fn.abi.is_some(),
+        syn::Type::FnPtr(fn_ptr) => fn_ptr.abi.is_some(),
         _ => PASSTHROUGH_TYPES.contains(&&*quote! { #ty }.to_string()),
     }
 }

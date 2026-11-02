@@ -11,25 +11,30 @@ pub struct Mapping {
 
 impl Mapping {
     pub fn self_type(receiver: &syn::Receiver, parent: &syn::Type) -> Result<Mapping, syn::Error> {
-        let syn::Receiver {
-            reference,
-            mutability,
-            ..
-        } = receiver.clone();
-
         let path = match parent {
             syn::Type::Path(path) => path,
             e => return Err(syn::Error::new_spanned(e, "not a valid self type path")),
         };
 
-        let output_type = match (reference, mutability) {
-            (None, _) => syn::Type::Path(path.clone()),
-            (Some((and_token, lifetime)), mutability) => syn::Type::Reference(syn::TypeReference {
-                and_token,
-                lifetime,
-                mutability,
-                elem: Box::new(syn::Type::Path(path.clone())),
-            }),
+        let output_type = match &receiver.kind {
+            syn::ReceiverKind::Value | syn::ReceiverKind::Typed(..) => {
+                syn::Type::Path(path.clone())
+            }
+            syn::ReceiverKind::Reference(and_token, lifetime, mutability) => {
+                syn::Type::Reference(syn::TypeReference {
+                    attrs: vec![],
+                    and_token: *and_token,
+                    lifetime: lifetime.clone(),
+                    mutability: *mutability,
+                    elem: Box::new(syn::Type::Path(path.clone())),
+                })
+            }
+            _ => {
+                return Err(syn::Error::new_spanned(
+                    receiver,
+                    "unsupported self receiver",
+                ));
+            }
         };
 
         Ok(Mapping {

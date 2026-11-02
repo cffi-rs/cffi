@@ -73,8 +73,8 @@ impl ForeignTypeExt for syn::Type {
     fn to_foreign_type(&self) -> Result<syn::Type, syn::Error> {
         match &self {
             syn::Type::Path(..) | syn::Type::Reference(..) => {}
-            syn::Type::BareFn(bare_fn) => {
-                if bare_fn.abi.is_some() {
+            syn::Type::FnPtr(fn_ptr) => {
+                if fn_ptr.abi.is_some() {
                     // This one is safe to pass through.
                     return Ok(self.clone());
                 }

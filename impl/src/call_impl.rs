@@ -19,7 +19,7 @@ pub(crate) fn call_with_impl(
         quote! { #item }
     });
 
-    if let Some(defaultness) = item.defaultness {
+    if let Some(defaultness) = item.modifiers.defaultness {
         return Err(syn::Error::new_spanned(
             defaultness,
             "Does not support specialised impls",
@@ -42,7 +42,7 @@ pub(crate) fn call_with_impl(
 
     if let Some(trait_) = item.trait_ {
         return Err(syn::Error::new_spanned(
-            &trait_.1,
+            &trait_.0,
             "Does not support trait impls",
         ));
     }
@@ -57,11 +57,13 @@ pub(crate) fn call_with_impl(
             syn::ImplItem::Fn(method) => match (
                 &method.vis,
                 method.sig.asyncness,
-                method.sig.unsafety,
+                &method.sig.safety,
                 &method.sig.abi,
                 &method.sig.generics.params.is_empty(),
             ) {
-                (syn::Visibility::Public(_), None, None, None, true) => Some(method),
+                (syn::Visibility::Public(_), None, syn::Safety::Default, None, true) => {
+                    Some(method)
+                }
                 _ => None,
             },
             _ => None,
