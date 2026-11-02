@@ -1,31 +1,34 @@
-use std::cell::RefCell;
+use std::ffi::c_void;
 use std::sync::{Arc, Mutex};
 
 use cffi::{ArcMarshaler, FromForeign, Slice, ToForeign};
 
-thread_local! {
-    static EXCEPTIONS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
-    static RETURNED: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+/// What a test's callbacks are handed, through the context pointer the test passes each call.
+#[derive(Default)]
+struct Calls {
+    exceptions: Vec<String>,
+    returned: Vec<String>,
 }
 
-extern "C" fn record_exception(msg: *const u8, len: usize) {
+impl Calls {
+    fn context(&mut self) -> *mut c_void {
+        (self as *mut Calls).cast()
+    }
+}
+
+extern "C" fn record_exception(msg: *const u8, len: usize, context: *mut c_void) {
     let bytes = unsafe { std::slice::from_raw_parts(msg, len) };
-    let message = std::str::from_utf8(bytes).unwrap().to_owned();
-    EXCEPTIONS.with(|e| e.borrow_mut().push(message));
+    let calls = unsafe { &mut *context.cast::<Calls>() };
+    calls
+        .exceptions
+        .push(std::str::from_utf8(bytes).unwrap().to_owned());
 }
 
-extern "C" fn record_return(slice: Slice<u8>) {
+extern "C" fn record_return(slice: Slice<u8>, context: *mut c_void) {
     let value = std::str::from_utf8(slice.as_ref()).unwrap().to_owned();
     unsafe { cffi::ffi::cffi_string_free(slice) };
-    RETURNED.with(|r| r.borrow_mut().push(value));
-}
-
-fn take_exceptions() -> Vec<String> {
-    EXCEPTIONS.with(|e| std::mem::take(&mut *e.borrow_mut()))
-}
-
-fn take_returned() -> Vec<String> {
-    RETURNED.with(|r| std::mem::take(&mut *r.borrow_mut()))
+    let calls = unsafe { &mut *context.cast::<Calls>() };
+    calls.returned.push(value);
 }
 
 fn str_slice(s: &str) -> Slice<u8> {
@@ -87,40 +90,67 @@ pub extern "C" fn test_greet_by_callback(
 
 #[test]
 fn a_panic_is_reported_and_returns_the_zero_value() {
-    let result = test_greet(str_slice("Ánde"), 1, Some(record_exception));
+    let mut calls = Calls::default();
+    let result = test_greet(
+        str_slice("Ánde"),
+        1,
+        Some(record_exception),
+        calls.context(),
+    );
 
     assert!(result.data.is_null());
     assert_eq!(result.len, 0);
-    assert_eq!(take_exceptions(), [r#"Panic("no greeting for Ánde")"#]);
+    assert_eq!(calls.exceptions, [r#"Panic("no greeting for Ánde")"#]);
 }
 
 #[test]
 fn a_call_that_does_not_panic_is_unchanged() {
-    let result = test_greet(str_slice("Ánde"), 0, Some(record_exception));
+    let mut calls = Calls::default();
+    let result = test_greet(
+        str_slice("Ánde"),
+        0,
+        Some(record_exception),
+        calls.context(),
+    );
 
     assert_eq!(take_string(result).as_deref(), Some("hello Ánde"));
-    assert!(take_exceptions().is_empty());
+    assert!(calls.exceptions.is_empty());
+}
+
+#[test]
+fn each_call_hands_back_its_own_context() {
+    let mut first = Calls::default();
+    let mut second = Calls::default();
+
+    test_panic_unit(str_slice("Ánde"), Some(record_exception), first.context());
+    test_panic_unit(str_slice("Biret"), Some(record_exception), second.context());
+
+    assert_eq!(first.exceptions, [r#"Panic("no greeting for Ánde")"#]);
+    assert_eq!(second.exceptions, [r#"Panic("no greeting for Biret")"#]);
 }
 
 #[test]
 fn a_panic_without_a_callback_given_returns_the_zero_value() {
-    let result = test_greet(str_slice("Ánde"), 1, None);
+    let result = test_greet(str_slice("Ánde"), 1, None, std::ptr::null_mut());
 
     assert!(result.data.is_null());
 }
 
 #[test]
 fn a_panic_in_a_function_returning_nothing_is_reported() {
-    test_panic_unit(str_slice("Ánde"), Some(record_exception));
+    let mut calls = Calls::default();
+    test_panic_unit(str_slice("Ánde"), Some(record_exception), calls.context());
 
-    assert_eq!(take_exceptions(), [r#"Panic("no greeting for Ánde")"#]);
+    assert_eq!(calls.exceptions, [r#"Panic("no greeting for Ánde")"#]);
 }
 
 #[test]
 fn a_panic_with_a_value_that_is_not_a_string_is_reported() {
-    assert_eq!(test_panic_any(str_slice("Ánde"), Some(record_exception)), 0);
+    let mut calls = Calls::default();
+    let result = test_panic_any(str_slice("Ánde"), Some(record_exception), calls.context());
 
-    assert_eq!(take_exceptions(), [r#"Panic("Box<dyn Any>")"#]);
+    assert_eq!(result, 0);
+    assert_eq!(calls.exceptions, [r#"Panic("Box<dyn Any>")"#]);
 }
 
 #[test]
@@ -131,23 +161,27 @@ fn a_panic_in_a_function_without_an_exception_callback_returns_the_zero_value() 
 
 #[test]
 fn a_panic_in_a_function_with_a_return_callback_is_reported() {
+    let mut calls = Calls::default();
     test_greet_by_callback(
         str_slice("Ánde"),
         0,
         Some(record_exception),
         Some(record_return),
+        calls.context(),
     );
-    assert_eq!(take_returned(), ["hello Ánde"]);
-    assert!(take_exceptions().is_empty());
+    assert_eq!(calls.returned, ["hello Ánde"]);
+    assert!(calls.exceptions.is_empty());
 
+    let mut calls = Calls::default();
     test_greet_by_callback(
         str_slice("Ánde"),
         1,
         Some(record_exception),
         Some(record_return),
+        calls.context(),
     );
-    assert!(take_returned().is_empty());
-    assert_eq!(take_exceptions(), [r#"Panic("no greeting for Ánde")"#]);
+    assert!(calls.returned.is_empty());
+    assert_eq!(calls.exceptions, [r#"Panic("no greeting for Ánde")"#]);
 }
 
 pub struct Thing {
@@ -201,17 +235,24 @@ pub unsafe extern "C" fn test_thing_free(thing: *const Thing) {
 
 #[test]
 fn an_arc_handle_is_released_by_its_free_function() {
-    let thing = test_thing_new(1, Some(record_exception));
+    let mut calls = Calls::default();
+    let thing = test_thing_new(1, Some(record_exception), calls.context());
     assert!(!thing.is_null());
 
-    assert_eq!(test_thing_id(thing, Some(record_exception)), 1);
-    assert_eq!(test_thing_id(thing, Some(record_exception)), 1);
+    assert_eq!(
+        test_thing_id(thing, Some(record_exception), calls.context()),
+        1
+    );
+    assert_eq!(
+        test_thing_id(thing, Some(record_exception), calls.context()),
+        1
+    );
     assert!(!dropped(1));
 
     unsafe { test_thing_free(thing) };
 
     assert!(dropped(1));
-    assert!(take_exceptions().is_empty());
+    assert!(calls.exceptions.is_empty());
 }
 
 #[test]
@@ -221,12 +262,20 @@ fn a_null_arc_handle_is_freed_as_nothing() {
 
 #[test]
 fn a_null_arc_handle_argument_is_reported() {
-    assert_eq!(test_thing_id(std::ptr::null(), Some(record_exception)), 0);
-    assert_eq!(test_thing_take(std::ptr::null(), Some(record_exception)), 0);
+    let mut calls = Calls::default();
+    let null = std::ptr::null();
 
-    let exceptions = take_exceptions();
-    assert_eq!(exceptions.len(), 2);
-    assert!(exceptions.iter().all(|e| e.contains("null pointer")));
+    assert_eq!(
+        test_thing_id(null, Some(record_exception), calls.context()),
+        0
+    );
+    assert_eq!(
+        test_thing_take(null, Some(record_exception), calls.context()),
+        0
+    );
+
+    assert_eq!(calls.exceptions.len(), 2);
+    assert!(calls.exceptions.iter().all(|e| e.contains("null pointer")));
 }
 
 #[test]
@@ -235,8 +284,12 @@ fn a_panic_leaves_the_callers_handle_as_it_was() {
     let weak = Arc::downgrade(&arc);
     let thing = ArcMarshaler::to_foreign(arc).unwrap();
 
-    assert_eq!(test_thing_panic(thing, Some(record_exception)), 0);
-    assert_eq!(take_exceptions(), [r#"Panic("thing 2")"#]);
+    let mut calls = Calls::default();
+    assert_eq!(
+        test_thing_panic(thing, Some(record_exception), calls.context()),
+        0
+    );
+    assert_eq!(calls.exceptions, [r#"Panic("thing 2")"#]);
     assert_eq!(weak.strong_count(), 1);
 
     unsafe { test_thing_free(thing) };

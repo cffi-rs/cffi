@@ -18,7 +18,7 @@ fn gen_throw(fallback: Option<TokenStream>, no_return: bool) -> TokenStream {
         {
             if let Some(callback) = __exception {
                 let err = format!("{:?}", e);
-                callback(err.as_bytes().as_ptr().cast(), err.len());
+                callback(err.as_bytes().as_ptr().cast(), err.len(), __context);
 
             }
             #fallback
@@ -339,15 +339,26 @@ impl Function {
             pub extern "C" fn #name
         };
 
-        sig.extend(if let Some(ty) = self.foreign_return_type()? {
-            if self.has_callback {
-                quote! { (#foreign_params, __return: ::cffi::RetCallback<#ty>) }
-            } else {
-                quote! { (#foreign_params) -> #ty }
-            }
-        } else {
-            quote! { (#foreign_params) }
-        });
+        let return_type = self.foreign_return_type()?;
+        let return_callback = match &return_type {
+            Some(ty) if self.has_callback => Some(quote! { __return: ::cffi::RetCallback<#ty> }),
+            _ => None,
+        };
+
+        // The caller's context comes last, after every callback it is handed back to.
+        let context = (self.has_exception_param || return_callback.is_some())
+            .then(|| quote! { __context: *mut ::std::ffi::c_void });
+
+        let params = foreign_params
+            .iter()
+            .map(|param| quote! { #param })
+            .chain(return_callback.clone())
+            .chain(context);
+        sig.extend(quote! { ( #(#params),* ) });
+
+        if let (Some(ty), None) = (return_type, return_callback) {
+            sig.extend(quote! { -> #ty });
+        }
 
         Ok(sig)
     }
@@ -384,7 +395,7 @@ impl Function {
                 if self.has_callback {
                     inner_block.extend(quote! {
                         if let Some(__return) = __return {
-                            __return(#call_name(#foreign_args));
+                            __return(#call_name(#foreign_args), __context);
                         }
                     });
                 } else {
@@ -427,7 +438,7 @@ impl Function {
                         let result = #call_name(#foreign_args);
                         if let Some(__return) = __return {
                             match #return_marshaler::to_foreign(result) {
-                                Ok(v) => __return(v),
+                                Ok(v) => __return(v, __context),
                                 Err(e) => #throw
                             }
                         }

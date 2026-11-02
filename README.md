@@ -23,6 +23,14 @@ What a marshaler hands to foreign code belongs to the caller until it is given b
 
 Each of these does nothing when given NULL, and catches a panic in a destructor.
 
+### Callbacks and their context
+
+A function `#[cffi::marshal]` makes that can fail takes, after its own arguments, an exception
+callback, `void (*)(const uint8_t *msg, size_t msg_len, void *context)`, and last of all a
+`void *context`, which it hands back to the callback untouched. A C function pointer captures
+nothing, so the context is how the callback reaches somewhere of the caller's to put the message.
+A return callback, where a function has one, comes before the context and is handed the same one.
+
 ### Panics
 
 A function `#[cffi::marshal]` makes catches a panic in its work rather than let it unwind into

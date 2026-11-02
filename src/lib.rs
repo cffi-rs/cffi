@@ -41,13 +41,18 @@ pub use vec_ref::VecRefMarshaler;
 
 use std::{io, marker::PhantomData};
 
-/// The exception callback a function `#[cffi::marshal]` makes takes as its last argument.
+/// The exception callback a function `#[cffi::marshal]` makes takes after its own arguments.
 ///
 /// It is called with a failure's message, the error formatted with `{:?}`, as a pointer to UTF-8
-/// bytes and their length, which stay valid only until it returns. A panic is reported as a
+/// bytes and their length, which stay valid only until it returns, and with the context pointer
+/// the caller passed as the function's last argument, untouched, so that a callback which captures
+/// nothing can still put the message somewhere of the caller's. A panic is reported as a
 /// [`Panic`]. Whatever the failure, the function then returns the zero value of its return type.
-pub type ErrCallback = Option<extern "C" fn(*const u8, usize)>;
-pub type RetCallback<T> = Option<extern "C" fn(T)>;
+pub type ErrCallback = Option<extern "C" fn(*const u8, usize, *mut std::ffi::c_void)>;
+
+/// The return callback a function `#[cffi::marshal(callback)]` makes takes in place of returning
+/// its value. It is called with the value and with the same context pointer as [`ErrCallback`].
+pub type RetCallback<T> = Option<extern "C" fn(T, *mut std::ffi::c_void)>;
 
 pub trait ReturnType {
     type Foreign;
