@@ -1,7 +1,3 @@
-// The functions `#[cffi::marshal]` makes are safe `extern "C"` functions that read through the
-// handles they are given, after checking them for NULL, which this lint cannot see.
-#![allow(clippy::not_unsafe_ptr_arg_deref)]
-
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 

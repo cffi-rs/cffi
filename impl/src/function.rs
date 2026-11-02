@@ -331,8 +331,11 @@ impl Function {
             ..
         } = self;
 
+        // The function is safe to call from C but reads through the pointers it is given, after
+        // its marshalers have checked them for NULL, which clippy cannot see.
         let mut sig = quote! {
             #[unsafe(no_mangle)]
+            #[allow(clippy::not_unsafe_ptr_arg_deref)]
             pub extern "C" fn #name
         };
 
