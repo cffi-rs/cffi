@@ -7,6 +7,7 @@ use std::sync::Arc;
 use crate::TraitObject;
 
 use super::null_ptr_error;
+use super::panic::drop_caught;
 use super::{FromForeign, InputType, ReturnType, ToForeign};
 
 pub struct ArcMarshaler<T: ?Sized>(PhantomData<T>);
@@ -82,5 +83,40 @@ impl<T: ?Sized> ToForeign<Result<Arc<T>, Box<dyn Error>>, *const T> for ArcMarsh
     #[inline(always)]
     fn to_foreign(local: Result<Arc<T>, Box<dyn Error>>) -> Result<*const T, Self::Error> {
         local.map(|x| Arc::into_raw(x) as *const _)
+    }
+}
+
+impl<T: ?Sized> ArcMarshaler<T> {
+    /// Gives up a reference that `ArcMarshaler::<T>::to_foreign` handed out, dropping the value
+    /// when no other reference is left.
+    ///
+    /// NULL is ignored, so the zero value a failed call returns can be freed like any other
+    /// handle. A panic in `T`'s destructor is caught here and goes no further.
+    ///
+    /// A generic function cannot be exported to C, so export a free function for each handle
+    /// type:
+    ///
+    /// ```rust
+    /// use cffi::ArcMarshaler;
+    ///
+    /// pub struct Client {
+    ///     pub name: String,
+    /// }
+    ///
+    /// #[unsafe(no_mangle)]
+    /// pub unsafe extern "C" fn Example_Client_free(client: *const Client) {
+    ///     unsafe { ArcMarshaler::free(client) }
+    /// }
+    /// ```
+    ///
+    /// # Safety
+    /// The pointer must be NULL or have come from `ArcMarshaler::<T>::to_foreign`, and the
+    /// reference it stands for must not already have been given up.
+    pub unsafe fn free(foreign: *const T) {
+        if foreign.is_null() {
+            return;
+        }
+
+        drop_caught(unsafe { Arc::from_raw(foreign) });
     }
 }

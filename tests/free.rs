@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use cffi::ffi::{cffi_string_free, cffi_vec_free};
-use cffi::{Slice, StrMarshaler, StringMarshaler, ToForeign, VecMarshaler};
+use cffi::{ArcMarshaler, Slice, StrMarshaler, StringMarshaler, ToForeign, VecMarshaler};
 
 /// Counts every deallocation whose layout is not the one the memory was allocated with. Freeing
 /// with the wrong layout is undefined behaviour the system allocator rarely notices, so each
@@ -163,6 +163,7 @@ fn null_and_empty_frees_do_nothing() {
         cffi_string_free(Slice::default());
         cffi_vec_free(Slice::default());
         VecMarshaler::<Counted>::free(Slice::default());
+        ArcMarshaler::<Counted>::free(std::ptr::null());
 
         // NULL data with a length, as a careless caller might pass.
         cffi_string_free(Slice {
@@ -179,4 +180,38 @@ fn null_and_empty_frees_do_nothing() {
     }
 
     assert_layouts_matched();
+}
+
+#[test]
+fn arc_free_releases_the_handle() {
+    let drops = Arc::new(AtomicUsize::new(0));
+    let arc = Arc::new(Counted::new(&drops, "handle"));
+    let weak = Arc::downgrade(&arc);
+
+    let handle = ArcMarshaler::to_foreign(arc).unwrap();
+    assert_eq!(weak.strong_count(), 1);
+
+    unsafe { ArcMarshaler::free(handle) };
+
+    assert_eq!(weak.strong_count(), 0);
+    assert_eq!(drops.load(Ordering::SeqCst), 1);
+    assert_layouts_matched();
+}
+
+#[test]
+fn arc_free_leaves_other_references() {
+    let drops = Arc::new(AtomicUsize::new(0));
+    let arc = Arc::new(Counted::new(&drops, "shared"));
+
+    let handle = ArcMarshaler::to_foreign(Arc::clone(&arc)).unwrap();
+    unsafe { ArcMarshaler::free(handle) };
+
+    assert_eq!(Arc::strong_count(&arc), 1);
+    assert_eq!(drops.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn arc_free_catches_a_panicking_destructor() {
+    let handle = ArcMarshaler::to_foreign(Arc::new(PanicsOnDrop)).unwrap();
+    unsafe { ArcMarshaler::free(handle) };
 }
