@@ -62,8 +62,15 @@ impl FromForeign<Slice<u8>, String> for StringMarshaler {
     }
 }
 
+/// Frees a string made by this library, such as one from [`StringMarshaler`] or
+/// [`StrMarshaler`](crate::StrMarshaler).
+///
+/// A slice with NULL data or a length of 0 is ignored, so an absent string, or the zero value a
+/// failed call returns, can be freed like any other.
+///
 /// # Safety
-/// The slice must have been created by this library and not already freed.
+/// The slice must have NULL data, a length of 0, or have been made by this library, and not
+/// already have been freed.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cffi_string_free(slice: Slice<u8>) {
     unsafe { crate::vec::cffi_vec_free(slice.cast()) };

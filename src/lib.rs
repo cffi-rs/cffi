@@ -9,6 +9,7 @@ mod bool;
 mod box_ref;
 mod boxed;
 mod copy;
+mod panic;
 mod pathbuf;
 mod str;
 mod string;

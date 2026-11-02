@@ -10,6 +10,16 @@ both for exporting interfaces and consuming functions from C libraries.
 
 See the documentation for the various marshallers available.
 
+### Freeing
+
+What a marshaler hands to foreign code belongs to the caller until it is given back:
+
+- a string: `cffi_string_free`
+- a `Vec<u8>`: `cffi_vec_free`
+- a `Vec<T>` of any other `T`: a free function of your own that calls `VecMarshaler::<T>::free`
+
+Each of these does nothing when given NULL, and catches a panic in a destructor.
+
 ## Where is this used?
 
 - [pahkat](https://github.com/divvun/pahkat) - a multi-platform package management framework
