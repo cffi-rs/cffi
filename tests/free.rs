@@ -1,9 +1,12 @@
 use std::alloc::{GlobalAlloc, Layout, System};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use cffi::ffi::{cffi_string_free, cffi_vec_free};
-use cffi::{ArcMarshaler, Slice, StrMarshaler, StringMarshaler, ToForeign, VecMarshaler};
+use cffi::{
+    ArcMarshaler, PathBufMarshaler, Slice, StrMarshaler, StringMarshaler, ToForeign, VecMarshaler,
+};
 
 /// Counts every deallocation whose layout is not the one the memory was allocated with. Freeing
 /// with the wrong layout is undefined behaviour the system allocator rarely notices, so each
@@ -158,12 +161,22 @@ fn byte_frees_free_strings_and_bytes() {
 }
 
 #[test]
+fn path_free_frees_a_path_with_its_layout() {
+    let path = PathBufMarshaler::to_foreign(PathBuf::from("dir/file.txt")).unwrap();
+    assert!(!path.data.is_null());
+    unsafe { PathBufMarshaler::free(path) };
+
+    assert_layouts_matched();
+}
+
+#[test]
 fn null_and_empty_frees_do_nothing() {
     unsafe {
         cffi_string_free(Slice::default());
         cffi_vec_free(Slice::default());
         VecMarshaler::<Counted>::free(Slice::default());
         ArcMarshaler::<Counted>::free(std::ptr::null());
+        PathBufMarshaler::free(Slice::default());
 
         // NULL data with a length, as a careless caller might pass.
         cffi_string_free(Slice {

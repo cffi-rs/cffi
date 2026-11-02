@@ -18,6 +18,8 @@ What a marshaler hands to foreign code belongs to the caller until it is given b
 - a `Vec<u8>`: `cffi_vec_free`
 - a `Vec<T>` of any other `T`: a free function of your own that calls `VecMarshaler::<T>::free`
 - an `Arc<T>`: a free function of your own that calls `ArcMarshaler::<T>::free`
+- a path from `PathBufMarshaler`, UTF-16 on Windows and bytes elsewhere: a free function of your
+  own that calls `PathBufMarshaler::free`
 
 Each of these does nothing when given NULL, and catches a panic in a destructor.
 

@@ -12,6 +12,31 @@ use crate::{FromForeign, InputType, ReturnType, Slice, ToForeign};
 pub struct PathBufMarshaler;
 
 #[cfg(unix)]
+impl PathBufMarshaler {
+    /// Frees a path made by `PathBufMarshaler::to_foreign`.
+    ///
+    /// A slice with NULL data or a length of 0 is ignored. A path crosses as UTF-16 on Windows
+    /// and as bytes elsewhere, so neither `cffi_string_free` nor `cffi_vec_free` can free it on
+    /// every OS; a library that returns one exports a free function of its own that calls this:
+    ///
+    /// ```rust
+    /// use cffi::{PathBufMarshaler, ReturnType};
+    ///
+    /// #[unsafe(no_mangle)]
+    /// pub unsafe extern "C" fn Example_Path_free(path: <PathBufMarshaler as ReturnType>::Foreign) {
+    ///     unsafe { PathBufMarshaler::free(path) }
+    /// }
+    /// ```
+    ///
+    /// # Safety
+    /// The slice must have NULL data, a length of 0, or have been made by
+    /// `PathBufMarshaler::to_foreign`, and not already have been freed.
+    pub unsafe fn free(slice: Slice<u8>) {
+        unsafe { VecMarshaler::<u8>::free(slice) }
+    }
+}
+
+#[cfg(unix)]
 impl InputType for PathBufMarshaler {
     type Foreign = Slice<u8>;
     type ForeignTraitObject = ();
