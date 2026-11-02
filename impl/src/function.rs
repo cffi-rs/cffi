@@ -26,6 +26,26 @@ fn gen_throw(fallback: Option<TokenStream>, no_return: bool) -> TokenStream {
     }
 }
 
+/// The value a function returns when it fails, or `None` when it returns nothing.
+fn gen_zero_value(
+    ret_ty: Option<&syn::Type>,
+    return_marshaler: Option<&syn::Path>,
+    has_callback: bool,
+) -> Option<TokenStream> {
+    ret_ty.filter(|_| !has_callback).map(|ty| {
+        if matches!(ty, syn::Type::BareFn(_)) {
+            // A function pointer is never NULL, so there is no zero value to return.
+            quote! { ::std::process::abort() }
+        } else if crate::is_passthrough_type(ty) {
+            quote! { <#ty>::default() }
+        } else if is_trait_object(ty) {
+            quote! { <#return_marshaler as ::cffi::ReturnType>::foreign_default_trait_object() }
+        } else {
+            quote! { <#return_marshaler as ::cffi::ReturnType>::foreign_default() }
+        }
+    })
+}
+
 fn gen_try_not_null(
     path: TokenStream,
     fallback: Option<TokenStream>,
@@ -45,9 +65,7 @@ fn gen_foreign(
     marshaler: &MarshalAttr,
     name: &syn::Pat,
     out_ty: &syn::Type,
-    out_marshaler: Option<&syn::Path>,
-    ret_ty: Option<&syn::Type>,
-    has_callback: bool,
+    zero_value: Option<TokenStream>,
 ) -> TokenStream {
     let marshaler_path = &marshaler.path;
     let marshal_ty = marshaler.first_type();
@@ -61,15 +79,7 @@ fn gen_foreign(
         } else {
             quote! { unsafe { #marshaler_path::from_foreign(#name) } }
         },
-        ret_ty.filter(|_| !has_callback).map(|ty| {
-            if crate::is_passthrough_type(ty) {
-                quote! { <#ty>::default() }
-            } else if is_trait_object(ty) {
-                quote! { <#out_marshaler as ::cffi::ReturnType>::foreign_default_trait_object() }
-            } else {
-                quote! { <#out_marshaler as ::cffi::ReturnType>::foreign_default() }
-            }
-        }),
+        zero_value,
         false,
     );
 
@@ -105,6 +115,8 @@ pub struct Function {
     fn_marshal_attr: Option<MarshalAttr>,
     has_exceptions: bool,
     has_callback: bool,
+    has_exception_param: bool,
+    zero_value: Option<TokenStream>,
 }
 
 impl std::fmt::Debug for Function {
@@ -184,6 +196,12 @@ impl Function {
             .local
             .resolve_marshaler(fn_marshal_attr.as_ref());
 
+        let zero_value = gen_zero_value(
+            return_type.foreign_type().as_ref(),
+            return_marshaler,
+            has_callback,
+        );
+
         let mut has_exceptions = false;
 
         for (i, param) in params.iter().enumerate() {
@@ -217,14 +235,7 @@ impl Function {
                     ))
                 };
 
-                let foreign = gen_foreign(
-                    marshaler,
-                    &name,
-                    out_type,
-                    return_marshaler,
-                    return_type.foreign_type().as_ref(),
-                    has_callback,
-                );
+                let foreign = gen_foreign(marshaler, &name, out_type, zero_value.clone());
                 from_foreigns.extend(foreign);
                 has_exceptions = true;
             } else if !crate::is_passthrough_type(out_type) {
@@ -236,14 +247,7 @@ impl Function {
                     path: syn::parse2(quote! { ::cffi::BoxMarshaler::<#out_type> })?,
                     types: vec![out_type.clone()],
                 };
-                let foreign = gen_foreign(
-                    &box_marshaler,
-                    &name,
-                    out_type,
-                    return_marshaler,
-                    return_type.foreign_type().as_ref(),
-                    has_callback,
-                );
+                let foreign = gen_foreign(&box_marshaler, &name, out_type, zero_value.clone());
                 from_foreigns.extend(foreign);
                 has_exceptions = true;
             }
@@ -257,7 +261,9 @@ impl Function {
             .map(|ty| crate::is_passthrough_type(&ty))
             .unwrap_or(true);
 
-        if has_exceptions || !passthrough_return {
+        let has_exception_param = has_exceptions || !passthrough_return;
+
+        if has_exception_param {
             foreign_params.push(syn::PatType {
                 attrs: vec![],
                 pat: Box::new(syn::Pat::Verbatim(quote! { __exception })),
@@ -278,7 +284,44 @@ impl Function {
             fn_marshal_attr,
             has_exceptions,
             has_callback,
+            has_exception_param,
+            zero_value,
         })
+    }
+
+    /// The foreign type the function returns, or hands to its return callback, or `None` when it
+    /// returns nothing.
+    fn foreign_return_type(&self) -> Result<Option<TokenStream>, syn::Error> {
+        let syn::ReturnType::Type(_, ty) = &self.return_type.local else {
+            return Ok(None);
+        };
+
+        if crate::is_passthrough_type(ty) {
+            return Ok(Some(quote! { #ty }));
+        }
+
+        let return_marshaler = match ty.resolve_marshaler(self.fn_marshal_attr.as_ref()) {
+            Some(v) => v,
+            None => {
+                return Err(syn::Error::new_spanned(
+                    ty,
+                    format!("no marshaler found for return type {}", quote! { #ty }),
+                ));
+            }
+        };
+
+        let is_trait_object = self
+            .fn_marshal_attr
+            .as_ref()
+            .and_then(|x| x.first_type())
+            .map(|x| is_trait_object(&x))
+            .unwrap_or(false);
+
+        Ok(Some(if is_trait_object {
+            quote! { <#return_marshaler as ::cffi::ReturnType>::ForeignTraitObject }
+        } else {
+            quote! { <#return_marshaler as ::cffi::ReturnType>::Foreign }
+        }))
     }
 
     fn build_signature(&self) -> Result<TokenStream, syn::Error> {
@@ -293,37 +336,7 @@ impl Function {
             pub extern "C" fn #name
         };
 
-        let ty = if let syn::ReturnType::Type(_, ty) = &self.return_type.local {
-            Some(if crate::is_passthrough_type(ty) {
-                quote! { #ty }
-            } else {
-                let return_marshaler = match ty.resolve_marshaler(self.fn_marshal_attr.as_ref()) {
-                    Some(v) => v,
-                    None => {
-                        return Err(syn::Error::new_spanned(
-                            ty,
-                            format!("no marshaler found for return type {}", quote! { #ty }),
-                        ));
-                    }
-                };
-
-                let is_trait_object = self
-                    .fn_marshal_attr
-                    .as_ref()
-                    .and_then(|x| x.first_type())
-                    .map(|x| is_trait_object(&x))
-                    .unwrap_or(false);
-                if is_trait_object {
-                    quote! { <#return_marshaler as ::cffi::ReturnType>::ForeignTraitObject }
-                } else {
-                    quote! { <#return_marshaler as ::cffi::ReturnType>::Foreign }
-                }
-            })
-        } else {
-            None
-        };
-
-        sig.extend(if let Some(ty) = ty {
+        sig.extend(if let Some(ty) = self.foreign_return_type()? {
             if self.has_callback {
                 quote! { (#foreign_params, __return: ::cffi::RetCallback<#ty>) }
             } else {
@@ -445,13 +458,46 @@ impl Function {
         Ok(inner_block)
     }
 
+    /// Runs the function's work inside `catch_unwind`, since a panic unwinding out of an
+    /// `extern "C"` function aborts the process. A caught panic is reported through the exception
+    /// callback, when the function has one, and the function returns its zero value.
+    fn build_unwind_guard(&self, inner_block: TokenStream) -> Result<TokenStream, syn::Error> {
+        let ret_ty = match self.foreign_return_type()? {
+            Some(ty) if !self.has_callback => ty,
+            _ => quote! { () },
+        };
+
+        let on_panic = if self.has_exception_param {
+            let throw = gen_throw(self.zero_value.clone(), false);
+            quote! {
+                Err(e) => {
+                    let e = ::cffi::Panic::from(e);
+                    #throw
+                }
+            }
+        } else {
+            let zero_value = self.zero_value.clone().unwrap_or_else(|| quote! { () });
+            quote! { Err(_) => #zero_value }
+        };
+
+        Ok(quote! {
+            match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(move || -> #ret_ty {
+                #inner_block
+            })) {
+                Ok(v) => v,
+                #on_panic
+            }
+        })
+    }
+
     pub fn to_token_stream(&self) -> Result<TokenStream, syn::Error> {
         let sig = self.build_signature()?;
         let inner_block = self.build_inner_block()?;
+        let body = self.build_unwind_guard(inner_block)?;
 
         Ok(quote! {
             #sig {
-                #inner_block
+                #body
             }
         })
     }

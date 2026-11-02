@@ -26,6 +26,7 @@ pub mod ffi {
 pub use self::url::UrlMarshaler;
 
 pub use self::bool::BoolMarshaler;
+pub use self::panic::Panic;
 pub use self::pathbuf::PathBufMarshaler;
 pub use self::str::StrMarshaler;
 pub use self::vec::VecMarshaler;
@@ -40,6 +41,11 @@ pub use vec_ref::VecRefMarshaler;
 
 use std::{io, marker::PhantomData};
 
+/// The exception callback a function `#[cffi::marshal]` makes takes as its last argument.
+///
+/// It is called with a failure's message, the error formatted with `{:?}`, as a pointer to UTF-8
+/// bytes and their length, which stay valid only until it returns. A panic is reported as a
+/// [`Panic`]. Whatever the failure, the function then returns the zero value of its return type.
 pub type ErrCallback = Option<extern "C" fn(*const u8, usize)>;
 pub type RetCallback<T> = Option<extern "C" fn(T)>;
 

@@ -21,6 +21,12 @@ What a marshaler hands to foreign code belongs to the caller until it is given b
 
 Each of these does nothing when given NULL, and catches a panic in a destructor.
 
+### Panics
+
+A function `#[cffi::marshal]` makes catches a panic in its work rather than let it unwind into
+foreign code, reports it through the exception callback as a `cffi::Panic`, and returns the zero
+value of its return type. This needs `panic = "unwind"`, the default.
+
 ## Where is this used?
 
 - [pahkat](https://github.com/divvun/pahkat) - a multi-platform package management framework
